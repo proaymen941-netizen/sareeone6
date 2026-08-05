@@ -104,6 +104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Admin and Advanced Routes
   app.use("/api/admin", adminRoutes);
+  app.use(["/api/restaurant-accounts", "/api/admin/restaurant-accounts"], restaurantAccountsRouter);
   registerAdvancedRoutes(app);
 
   // Users

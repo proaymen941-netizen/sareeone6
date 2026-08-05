@@ -6,7 +6,6 @@
 // @ts-nocheck
 import express from "express";
 import { storage } from "../storage";
-import { DatabaseStorage } from "../db";
 import { AdvancedDatabaseStorage } from "../db-advanced";
 import { z } from "zod";
 import { eq, desc, and, inArray } from "drizzle-orm";
@@ -20,43 +19,94 @@ function getAdvStorage() {
   return new AdvancedDatabaseStorage(db);
 }
 
+// دالة آمنة لجلب الطلبات المسندة للمتجر
+async function safeGetOrdersForRestaurant(restaurantId: string) {
+  try {
+    if (db && typeof db.select === 'function') {
+      const dbOrders = await db.select().from(orders).where(eq(orders.restaurantId, restaurantId));
+      if (Array.isArray(dbOrders)) return dbOrders;
+    }
+  } catch (err) {
+    // DB query failed, fallback to memory storage
+  }
+  try {
+    const allOrders = await storage.getOrders();
+    return (allOrders || []).filter((o: any) => o.restaurantId === restaurantId);
+  } catch (err) {
+    return [];
+  }
+}
+
+// دالة آمنة لجلب طلبات السحب للمتجر
+async function safeGetWithdrawalsForRestaurant(restaurantId: string) {
+  try {
+    if (db && typeof db.select === 'function') {
+      const dbWithdrawals = await db.select().from(withdrawalRequests)
+        .where(and(eq(withdrawalRequests.entityId, restaurantId), eq(withdrawalRequests.entityType, 'restaurant')));
+      if (Array.isArray(dbWithdrawals)) return dbWithdrawals;
+    }
+  } catch (err) {
+    // DB query failed
+  }
+  try {
+    const all = await storage.getWithdrawalRequests(restaurantId, 'restaurant');
+    return all || [];
+  } catch (err) {
+    return [];
+  }
+}
+
 // جلب جميع حسابات المطاعم (للمدير)
 router.get("/", async (req, res) => {
   try {
     const advStorage = getAdvStorage();
     const allRestaurants = await dbStorage.getRestaurants();
 
+    if (!Array.isArray(allRestaurants) || allRestaurants.length === 0) {
+      return res.json([]);
+    }
+
     const accounts = await Promise.all(allRestaurants.map(async (restaurant) => {
-      const wallet = await advStorage.getRestaurantWallet(restaurant.id);
+      let wallet: any = null;
+      try {
+        wallet = await advStorage.getRestaurantWallet(restaurant.id);
+      } catch (_) {}
 
-      const restaurantOrders = await db.select().from(orders).where(eq(orders.restaurantId, restaurant.id));
-      const deliveredOrders = restaurantOrders.filter(o => o.status === 'delivered');
-      const totalRevenue = deliveredOrders.reduce((sum, o) => sum + parseFloat(o.restaurantEarnings?.toString() || '0'), 0);
+      const restaurantOrders = await safeGetOrdersForRestaurant(restaurant.id);
+      const deliveredOrders = restaurantOrders.filter((o: any) => o.status === 'delivered');
+      
+      const totalRevenue = deliveredOrders.reduce((sum: number, o: any) => {
+        const earnings = o.restaurantEarnings ?? (parseFloat(o.subtotal || o.totalAmount || '0') * 0.85);
+        return sum + parseFloat(earnings?.toString() || '0');
+      }, 0);
 
-      const allWithdrawals = await db.select().from(withdrawalRequests)
-        .where(and(eq(withdrawalRequests.entityId, restaurant.id), eq(withdrawalRequests.entityType, 'restaurant')));
+      const allWithdrawals = await safeGetWithdrawalsForRestaurant(restaurant.id);
       const pendingAmount = allWithdrawals
-        .filter(w => w.status === 'pending')
-        .reduce((sum, w) => sum + parseFloat(w.amount?.toString() || '0'), 0);
+        .filter((w: any) => w.status === 'pending')
+        .reduce((sum: number, w: any) => sum + parseFloat(w.amount?.toString() || '0'), 0);
       const withdrawnAmount = allWithdrawals
-        .filter(w => w.status === 'completed')
-        .reduce((sum, w) => sum + parseFloat(w.amount?.toString() || '0'), 0);
+        .filter((w: any) => w.status === 'completed')
+        .reduce((sum: number, w: any) => sum + parseFloat(w.amount?.toString() || '0'), 0);
+
+      const calcBalance = wallet?.balance !== undefined 
+        ? wallet.balance.toString() 
+        : Math.max(0, totalRevenue - withdrawnAmount - pendingAmount).toFixed(2);
 
       return {
         restaurant: {
           id: restaurant.id,
-          name: restaurant.name,
-          image: restaurant.image,
-          isActive: restaurant.isActive,
+          name: restaurant.name || 'متجر شريك',
+          image: restaurant.image || null,
+          isActive: restaurant.isActive ?? true,
           phone: restaurant.phone || '',
         },
         account: {
           totalOrders: deliveredOrders.length,
           totalRevenue: totalRevenue.toFixed(2),
-          availableBalance: wallet?.balance?.toString() || '0',
+          availableBalance: calcBalance,
           pendingAmount: pendingAmount.toFixed(2),
           withdrawnAmount: withdrawnAmount.toFixed(2),
-          commissionRate: restaurant.commissionRate?.toString() || '0'
+          commissionRate: restaurant.commissionRate?.toString() || '15'
         }
       };
     }));
@@ -64,7 +114,7 @@ router.get("/", async (req, res) => {
     res.json(accounts);
   } catch (error) {
     console.error('خطأ في جلب حسابات المطاعم:', error);
-    res.status(500).json({ error: "خطأ في الخادم" });
+    res.status(500).json({ error: "خطأ في الخادم عند جلب حسابات المطاعم" });
   }
 });
 
@@ -73,19 +123,30 @@ router.get("/all-withdrawals", async (req, res) => {
   try {
     const { status } = req.query;
 
-    let allWithdrawals = await db.select().from(withdrawalRequests)
-      .where(eq(withdrawalRequests.entityType, 'restaurant'))
-      .orderBy(desc(withdrawalRequests.createdAt));
+    let allWithdrawals: any[] = [];
+    try {
+      if (db && typeof db.select === 'function') {
+        allWithdrawals = await db.select().from(withdrawalRequests)
+          .where(eq(withdrawalRequests.entityType, 'restaurant'))
+          .orderBy(desc(withdrawalRequests.createdAt));
+      }
+    } catch (_) {}
+
+    if (!Array.isArray(allWithdrawals) || allWithdrawals.length === 0) {
+      try {
+        allWithdrawals = await storage.getWithdrawalRequests('all', 'restaurant');
+      } catch (_) {}
+    }
 
     if (status && typeof status === 'string' && status !== 'all') {
-      allWithdrawals = allWithdrawals.filter(w => w.status === status);
+      allWithdrawals = (allWithdrawals || []).filter((w: any) => w.status === status);
     }
 
     // إضافة اسم المطعم لكل طلب
     const allRestaurants = await dbStorage.getRestaurants();
-    const restaurantMap = new Map(allRestaurants.map(r => [r.id, r]));
+    const restaurantMap = new Map((allRestaurants || []).map((r: any) => [r.id, r]));
 
-    const enriched = allWithdrawals.map(w => {
+    const enriched = (allWithdrawals || []).map((w: any) => {
       const restaurant = restaurantMap.get(w.entityId);
       let bankInfo: any = {};
       try {
