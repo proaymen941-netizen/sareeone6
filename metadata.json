@@ -1,0 +1,6 @@
+{
+  "name": "السريع ون - Saree One",
+  "description": "تطبيق السريع ون لتوصيل الطلبات والمتاجر والخدمات",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
