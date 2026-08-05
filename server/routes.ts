@@ -1126,8 +1126,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register customer routes
   app.use("/api/customer", customerRoutes);
   
-  // Register driver routes (plural for consistency)
-  app.use("/api/drivers", driverRoutes);
+  // Register driver routes (both plural and singular for full compatibility)
+  app.use(["/api/drivers", "/api/driver"], driverRoutes);
   
   // Register orders routes
   app.use("/api/orders", ordersRoutes);

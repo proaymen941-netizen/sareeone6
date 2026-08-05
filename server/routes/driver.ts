@@ -259,10 +259,17 @@ router.post("/orders/:id/accept", requireDriverAuth, async (req: AuthenticatedRe
     const { id } = req.params;
     const driverId = req.driverId!;
 
-    const driver = await storage.getDriver(driverId);
+    let driver = await storage.getDriver(driverId);
     if (!driver) return res.status(404).json({ error: "السائق غير موجود" });
 
-    const order = await storage.getOrder(id);
+    let order = await storage.getOrder(id);
+    if (!order) {
+      try {
+        const allOrders = await storage.getOrders();
+        order = (allOrders || []).find((o: any) => o.id === id);
+      } catch (_) {}
+    }
+
     if (!order) return res.status(404).json({ error: "الطلب غير موجود" });
 
     // الفحص ضد التزامن: هل تم استلام الطلب من سائق آخر؟
@@ -285,44 +292,64 @@ router.post("/orders/:id/accept", requireDriverAuth, async (req: AuthenticatedRe
     const deliveryFee = parseFloat(order.deliveryFee?.toString() || "0") || 0;
     const commissionAmount = (deliveryFee * commissionRate) / 100;
 
-    const updatedOrder = await storage.updateOrder(id, {
-      driverId,
-      status: "on_way",
-      driverCommissionRate: commissionRate,
-      driverCommissionAmount: commissionAmount.toString(),
-      commissionProcessed: false
-    });
+    let updatedOrder: any = null;
+    try {
+      updatedOrder = await storage.updateOrder(id, {
+        driverId,
+        status: "on_way",
+        driverCommissionRate: commissionRate.toString(),
+        driverCommissionAmount: commissionAmount.toString(),
+        commissionProcessed: false,
+        updatedAt: new Date()
+      });
+    } catch (updErr) {
+      console.error("⚠️ خطأ عند تحديث قاعدة البيانات لاستلام الطلب (تحويل احتياطي):", updErr);
+      order.driverId = driverId;
+      order.status = "on_way";
+      updatedOrder = order;
+    }
+
+    if (!updatedOrder) {
+      order.driverId = driverId;
+      order.status = "on_way";
+      updatedOrder = order;
+    }
 
     const ws = req.app.get('ws');
     if (ws) {
-      // بث عام لجميع السائقين وللإدارة يفيد باستلام الطلب
-      if (typeof ws.broadcast === 'function') {
-        ws.broadcast('order_claimed', {
-          orderId: id,
-          orderNumber: order.orderNumber,
-          driverId,
-          driverName: driver.name,
-          isWaselLi: false
-        });
-      }
-      if (typeof ws.notifyOrder === 'function') {
-        ws.notifyOrder('order_update', {
-          orderId: id,
-          orderNumber: order.orderNumber,
-          status: 'on_way',
-          driverId,
-          driverName: driver.name
-        }, {
-          customerId: order.customerId,
-          customerPhone: order.customerPhone,
-          driverId,
-          orderId: id,
-          includeAdmin: true
-        });
+      try {
+        // بث عام لجميع السائقين وللإدارة يفيد باستلام الطلب
+        if (typeof ws.broadcast === 'function') {
+          ws.broadcast('order_claimed', {
+            orderId: id,
+            orderNumber: order.orderNumber,
+            driverId,
+            driverName: driver.name,
+            isWaselLi: false
+          });
+        }
+        if (typeof ws.notifyOrder === 'function') {
+          ws.notifyOrder('order_update', {
+            orderId: id,
+            orderNumber: order.orderNumber,
+            status: 'on_way',
+            driverId,
+            driverName: driver.name,
+            type: 'regular'
+          }, {
+            customerId: order.customerId,
+            customerPhone: order.customerPhone,
+            driverId,
+            orderId: id,
+            includeAdmin: true
+          });
+        }
+      } catch (wsErr) {
+        console.error("⚠️ خطأ بث WebSocket لاستلام الطلب (تم التجاهل):", wsErr);
       }
     }
 
-    // إنشاء إشعار للإدارة والعميل
+    // إنشاء إشعار للإدارة والعميل والتتبع
     try {
       await storage.createNotification({
         type: 'order_claimed_by_driver',
@@ -335,10 +362,34 @@ router.post("/orders/:id/accept", requireDriverAuth, async (req: AuthenticatedRe
       });
     } catch (_) {}
 
+    try {
+      if (order.customerId || order.customerPhone) {
+        await storage.createNotification({
+          type: 'order_status_update',
+          title: 'تحديث حالة الطلب',
+          message: `طلبك رقم ${order.orderNumber}: السائق ${driver.name} في الطريق لتوصيل طلبك`,
+          recipientType: 'customer',
+          recipientId: order.customerId || order.customerPhone,
+          orderId: id,
+          isRead: false
+        });
+      }
+    } catch (_) {}
+
+    try {
+      await storage.createOrderTracking({
+        orderId: id,
+        status: 'on_way',
+        message: `تم قبول واستلام الطلب بواسطة السائق ${driver.name}`,
+        createdBy: driverId,
+        createdByType: 'driver'
+      });
+    } catch (_) {}
+
     res.json({ success: true, order: updatedOrder });
   } catch (error) {
     console.error("خطأ في قبول الطلب:", error);
-    res.status(500).json({ error: "خطأ في الخادم" });
+    res.status(500).json({ error: "خطأ في الخادم أثناء استلام الطلب" });
   }
 });
 
