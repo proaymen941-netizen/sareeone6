@@ -1,6 +1,7 @@
 import express from "express";
 import { storage } from "../storage.js";
 import { wasalniRequests, insertWasalniRequestSchema, notifications } from "../../shared/schema.js";
+import { normalizeYemeniPhone, validateYemeniPhone } from "../../shared/phoneUtils.js";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
@@ -82,6 +83,13 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "البيانات الأساسية مطلوبة: الاسم، الهاتف، من عنوان، إلى عنوان" });
     }
 
+    // التحقق من صحة رقم الهاتف والبادئة المسموحة (71, 77, 78, 73, 70)
+    const normalizedPhone = normalizeYemeniPhone(String(customerPhone));
+    const phoneError = validateYemeniPhone(normalizedPhone);
+    if (phoneError) {
+      return res.status(400).json({ error: phoneError });
+    }
+
     let requestNumber;
     try {
       const allSettings = await storage.getUiSettings();
@@ -100,7 +108,7 @@ router.post("/", async (req, res) => {
     const newRequest = await storage.createWasalniRequest({
       requestNumber,
       customerName: customerName.trim(),
-      customerPhone: customerPhone.trim(),
+      customerPhone: normalizedPhone,
       customerId: customerId || null,
       fromAddress: fromAddress.trim(),
       toAddress: toAddress.trim(),

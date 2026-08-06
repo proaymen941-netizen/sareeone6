@@ -3,7 +3,7 @@ import { useLocation } from 'wouter';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   ArrowRight, ArrowLeft, ArrowLeftRight, MapPin, Clock, ChevronDown,
-  Send, Package, CheckCircle, FileText, Bike, User, Phone, ClipboardList, Info, Loader2
+  Send, Package, CheckCircle, FileText, Bike, User, Phone, ClipboardList, Info, Loader2, ShieldCheck, KeyRound
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { queryClient } from '@/lib/queryClient';
 import { formatCurrency } from '@/lib/utils';
+import { normalizeYemeniPhone, validateYemeniPhone } from '@shared/phoneUtils';
 import {
   Select,
   SelectContent,
@@ -56,12 +57,70 @@ interface WasalniForm {
 export default function WasalniPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, sendOtp, verifyOtp } = useAuth();
   const [showInvoice, setShowInvoice] = useState(false);
   const [submittedRequest, setSubmittedRequest] = useState<any>(null);
   const [step, setStep] = useState(1);
   const [showSchedulePopup, setShowSchedulePopup] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
+
+  // حالات التحقق من ملكية الرقم
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+  const [showOtpDialog, setShowOtpDialog] = useState(false);
+  const [otpInput, setOtpInput] = useState('');
+  const [sendingOtpLoading, setSendingOtpLoading] = useState(false);
+  const [verifyingOtpLoading, setVerifyingOtpLoading] = useState(false);
+
+  const handleSendOtp = async () => {
+    const phoneErr = validateYemeniPhone(form.customerPhone);
+    if (phoneErr) {
+      toast({ title: "رقم الهاتف غير صحيح", description: phoneErr, variant: "destructive" });
+      return;
+    }
+    const cleanPhone = normalizeYemeniPhone(form.customerPhone);
+    setSendingOtpLoading(true);
+    try {
+      const res = await sendOtp(cleanPhone, 'wasalni');
+      if (res.disabled) {
+        setIsPhoneVerified(true);
+        toast({ title: "تم الاعتماد تلقائياً", description: "تم التحقق من رقم الهاتف بنجاح" });
+      } else {
+        setShowOtpDialog(true);
+        if (res.whatsappUrl) {
+          window.open(res.whatsappUrl, '_blank');
+        }
+        toast({ title: "تم إرسال رمز التحقق 💬", description: res.message || "أدخل رمز التحقق المكون من 4 أرقام" });
+      }
+    } catch (err: any) {
+      toast({ title: "خطأ", description: err.message || "فشل إرسال رمز التحقق", variant: "destructive" });
+    } finally {
+      setSendingOtpLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpInput.trim()) {
+      toast({ title: "رمز التحقق مطلوب", description: "يرجى إدخال الرمز المكون من 4 أرقام", variant: "destructive" });
+      return;
+    }
+    const cleanPhone = normalizeYemeniPhone(form.customerPhone);
+    setVerifyingOtpLoading(true);
+    try {
+      const res = await verifyOtp(cleanPhone, otpInput.trim());
+      if (res.success) {
+        setIsPhoneVerified(true);
+        setShowOtpDialog(false);
+        setOtpInput('');
+        toast({ title: "✅ تم التحقق من ملكية الرقم", description: "رقم هاتفك مؤكد تماماً الآن" });
+      } else {
+        toast({ title: "رمز غير صحيح", description: res.message || "يرجى التأكد من الرمز وإعادة المحاولة", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "خطأ في التحقق", description: err.message || "فشل التحقق من الرمز", variant: "destructive" });
+    } finally {
+      setVerifyingOtpLoading(false);
+    }
+  };
 
   const getLocationAddress = async (targetField: 'toAddress' | 'fromAddress') => {
     if (!navigator.geolocation) {
@@ -204,9 +263,18 @@ export default function WasalniPage() {
       toast({ title: "العنوان مطلوب", description: "يرجى تحديد مكان استلام الطلب", variant: "destructive" });
       return;
     }
-    if (step === 3 && (!form.customerName || !form.customerPhone)) {
-      toast({ title: "بيانات ناقصة", description: "يرجى إدخال الاسم ورقم الهاتف", variant: "destructive" });
-      return;
+    if (step === 3) {
+      if (!form.customerName.trim() || !form.customerPhone.trim()) {
+        toast({ title: "بيانات ناقصة", description: "يرجى إدخال الاسم ورقم الهاتف", variant: "destructive" });
+        return;
+      }
+      const phoneErr = validateYemeniPhone(form.customerPhone);
+      if (phoneErr) {
+        toast({ title: "رقم الهاتف غير صحيح 📱", description: phoneErr, variant: "destructive" });
+        return;
+      }
+      const cleanPhone = normalizeYemeniPhone(form.customerPhone);
+      setForm(p => ({ ...p, customerPhone: cleanPhone }));
     }
     
     if (step === 6) {
@@ -230,10 +298,21 @@ export default function WasalniPage() {
       });
       return;
     }
-    
+
+    const cleanPhone = normalizeYemeniPhone(form.customerPhone);
+    const phoneErr = validateYemeniPhone(cleanPhone);
+    if (phoneErr) {
+      toast({
+        title: "رقم الهاتف غير صحيح 📱",
+        description: phoneErr,
+        variant: "destructive"
+      });
+      return;
+    }
+
     createRequestMutation.mutate({
-      customerName: form.customerName,
-      customerPhone: form.customerPhone,
+      customerName: form.customerName.trim(),
+      customerPhone: cleanPhone,
       customerId: user?.id || undefined,
       fromAddress: form.fromAddress,
       toAddress: form.toAddress,
@@ -431,11 +510,11 @@ export default function WasalniPage() {
           <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4 animate-in fade-in slide-in-from-left-4">
             <div className="flex items-center gap-3 text-blue-600 mb-2">
               <User className="h-6 w-6" />
-              <h2 className="text-xl font-black">بيانات العميل</h2>
+              <h2 className="text-xl font-black">بيانات العميل والتحقق</h2>
             </div>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label className="font-bold text-gray-700">الاسم</Label>
+                <Label className="font-bold text-gray-700">الاسم بالكامل</Label>
                 <div className="relative">
                   <User className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <Input
@@ -446,21 +525,82 @@ export default function WasalniPage() {
                   />
                 </div>
               </div>
+
               <div className="space-y-2">
-                <Label className="font-bold text-gray-700">رقم الهاتف</Label>
+                <div className="flex justify-between items-center">
+                  <Label className="font-bold text-gray-700">رقم الهاتف (9 أرقام)</Label>
+                  <span className="text-xs text-gray-400">يبدأ بـ 71, 77, 78, 73, 70</span>
+                </div>
                 <div className="relative">
                   <Phone className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <Input
                     value={form.customerPhone}
-                    onChange={(e) => setForm(p => ({ ...p, customerPhone: e.target.value }))}
-                    placeholder="ادخل رقم هاتفك"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setForm(p => ({ ...p, customerPhone: val }));
+                      setIsPhoneVerified(false);
+                    }}
+                    placeholder="77XXXXXXX / 71XXXXXXX"
                     type="tel"
-                    className="h-14 pr-12 rounded-2xl border-gray-100 bg-gray-50 focus:bg-white focus:ring-blue-500 transition-all"
+                    maxLength={15}
+                    className="h-14 pr-12 rounded-2xl border-gray-100 bg-gray-50 focus:bg-white focus:ring-blue-500 transition-all font-mono text-left dir-ltr"
                   />
                 </div>
+
+                {/* حالة فحص وتأكيد ملكية رقم الهاتف */}
+                {form.customerPhone.trim() && (() => {
+                  const normalizedCurrent = normalizeYemeniPhone(form.customerPhone);
+                  const phoneErr = validateYemeniPhone(form.customerPhone);
+                  const isMatchUserPhone = !!(user && normalizedCurrent && normalizedCurrent === normalizeYemeniPhone(user.phone || ''));
+
+                  if (phoneErr) {
+                    return (
+                      <p className="text-xs font-semibold text-red-500 pt-1 flex items-center gap-1">
+                        ⚠️ {phoneErr}
+                      </p>
+                    );
+                  }
+
+                  if (isMatchUserPhone) {
+                    return (
+                      <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-xl text-xs font-bold mt-2">
+                        <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                        <span>رقم موثق ومطابق لحسابك المسجل ({user?.phone}) ✓</span>
+                      </div>
+                    );
+                  }
+
+                  if (isPhoneVerified) {
+                    return (
+                      <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-xl text-xs font-bold mt-2">
+                        <ShieldCheck className="h-4 w-4 text-green-600 shrink-0" />
+                        <span>تم التحقق من ملكية هذا الرقم بنجاح ✓</span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="flex items-center justify-between bg-blue-50 border border-blue-200 p-3 rounded-xl text-xs mt-2">
+                      <span className="text-blue-800 font-semibold">تأكيد ملكية هذا الرقم عبر رمز OTP:</span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleSendOtp}
+                        disabled={sendingOtpLoading}
+                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-1 text-xs h-8 font-bold gap-1"
+                      >
+                        {sendingOtpLoading ? (
+                          <><Loader2 className="h-3 w-3 animate-spin" /> جاري الإرسال...</>
+                        ) : (
+                          <><KeyRound className="h-3 w-3" /> التحقق الآن</>
+                        )}
+                      </Button>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 pt-2">
               <Button onClick={prevStep} variant="outline" className="h-14 rounded-2xl px-6 border-gray-200">
                 <ArrowRight className="h-5 w-5" />
               </Button>
@@ -594,6 +734,47 @@ export default function WasalniPage() {
               className="w-full h-12 rounded-xl font-bold"
             >
               إلغاء والعودة
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* OTP Ownership Verification Dialog */}
+      <Dialog open={showOtpDialog} onOpenChange={setShowOtpDialog}>
+        <DialogContent className="max-w-xs rounded-3xl" dir="rtl">
+          <DialogHeader className="items-center text-center">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-2">
+              <KeyRound className="h-8 w-8 text-blue-600" />
+            </div>
+            <DialogTitle className="text-xl font-black">رمز التحقق OTP</DialogTitle>
+            <DialogDescription className="text-gray-600 font-medium pt-2">
+              أدخل رمز التحقق المرسل لرقم الهاتف ({form.customerPhone}) تأكيداً لملكيته.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <Input
+              value={otpInput}
+              onChange={(e) => setOtpInput(e.target.value)}
+              placeholder="1234"
+              maxLength={6}
+              className="h-14 text-center text-2xl font-mono tracking-widest rounded-2xl bg-gray-50 border-gray-200 focus:bg-white"
+            />
+          </div>
+
+          <DialogFooter className="flex flex-col gap-2 pt-2">
+            <Button
+              onClick={handleVerifyOtp}
+              disabled={verifyingOtpLoading}
+              className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold"
+            >
+              {verifyingOtpLoading ? <Loader2 className="h-5 w-5 animate-spin mx-auto" /> : "تأكيد والتحقق"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowOtpDialog(false)}
+              className="w-full h-12 rounded-xl font-bold"
+            >
+              إلغاء
             </Button>
           </DialogFooter>
         </DialogContent>

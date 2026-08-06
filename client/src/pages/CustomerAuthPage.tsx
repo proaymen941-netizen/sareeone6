@@ -9,14 +9,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/context/AuthContext';
 import { Loader2, User, UserPlus, Phone, Lock, ArrowRight, ShieldCheck, RefreshCw, KeyRound, CheckCircle2, MessageCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { normalizeYemeniPhone, validateYemeniPhone } from '@shared/phoneUtils';
 
 export default function CustomerAuthPage() {
   const [, setLocation] = useLocation();
-  const { login, register, sendOtp, verifyOtp } = useAuth();
+  const { isAuthenticated, login, register, sendOtp, verifyOtp } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('login');
+
+  // تحديد الواجهة الافتراضية: الدخول بدلاً من التسجيل، إلا إذا طلب المستخدم التسجيل صراحة عبر URL
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const initialTab = searchParams.get('tab') === 'register' || searchParams.get('mode') === 'register' ? 'register' : 'login';
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  // إعادة التوجيه إلى الصفحة الرئيسية فوراً إذا كان المستخدم مسجل الدخول بالفعل
+  useEffect(() => {
+    if (isAuthenticated) {
+      setLocation('/');
+    }
+  }, [isAuthenticated, setLocation]);
 
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -67,21 +79,6 @@ export default function CustomerAuthPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // التحقق من رقم الهاتف اليمني: 9 أرقام يبدأ بـ 77، 78، 71، 70، أو 73
-  const validateYemeniPhone = (phone: string): string | null => {
-    const normalized = phone
-      .replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x0660))
-      .replace(/[\u06F0-\u06F9]/g, d => String(d.charCodeAt(0) - 0x06F0))
-      .replace(/\s+/g, '');
-    if (!/^\d{9}$/.test(normalized)) {
-      return 'رقم الهاتف يجب أن يتكون من 9 أرقام بالضبط';
-    }
-    if (!/^(77|78|71|70|73)/.test(normalized)) {
-      return 'رقم الهاتف يجب أن يبدأ بـ 77 أو 78 أو 71 أو 70 أو 73';
-    }
-    return null;
   };
 
   // 1. طلب إرسال رمز التحقق OTP
