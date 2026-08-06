@@ -85,10 +85,14 @@ export async function processOrderRevenue(order: Order): Promise<void> {
       });
     }
 
-    // حساب الإيرادات
+    // حساب الإيرادات (اعتماد نسبة العمولة من بيانات المتجر المحددة في حسابات المتاجر)
+    const restaurant = await storage.getRestaurant(order.restaurantId);
     const subtotal = parseFloat(order.subtotal || '0');
     const deliveryFee = parseFloat(order.deliveryFee || '0');
-    const commissionRate = parseFloat(account.commissionRate || String(DEFAULT_PLATFORM_COMMISSION));
+    const effectiveRateStr = restaurant?.commissionRate ?? account?.commissionRate;
+    const commissionRate = effectiveRateStr != null && !isNaN(parseFloat(effectiveRateStr))
+      ? parseFloat(effectiveRateStr)
+      : DEFAULT_PLATFORM_COMMISSION;
     
     const revenue = calculateOrderRevenue(subtotal, deliveryFee, commissionRate);
 

@@ -119,12 +119,11 @@ export default function AdminRestaurants() {
     mutationFn: async (data: typeof formData) => {
       const submitData = {
         ...data,
-        deliveryFee: 0,
-        perKmFee: 0,
-        commissionRate: data.commissionRate ? parseFloat(data.commissionRate) : 10,
-        latitude: data.latitude ? parseFloat(data.latitude) : null,
-        longitude: data.longitude ? parseFloat(data.longitude) : null,
-        categoryId: data.categoryId || null,
+        deliveryFee: '0',
+        perKmFee: '0',
+        latitude: data.latitude ? String(data.latitude) : null,
+        longitude: data.longitude ? String(data.longitude) : null,
+        categoryId: data.categoryId && data.categoryId !== 'null' ? data.categoryId : null,
         temporaryCloseReason: data.isTemporarilyClosed ? (data.temporaryCloseReason || null) : null,
       };
       const response = await apiRequest('POST', '/api/admin/restaurants', submitData);
@@ -152,10 +151,9 @@ export default function AdminRestaurants() {
     mutationFn: async ({ id, data }: { id: string; data: Partial<typeof formData> }) => {
       const submitData = {
         ...data,
-        commissionRate: data.commissionRate != null && data.commissionRate !== '' ? parseFloat(data.commissionRate) : undefined,
-        latitude: data.latitude === '' || data.latitude == null ? null : parseFloat(data.latitude),
-        longitude: data.longitude === '' || data.longitude == null ? null : parseFloat(data.longitude),
-        categoryId: data.categoryId || null,
+        latitude: data.latitude && String(data.latitude).trim() !== '' ? String(data.latitude) : null,
+        longitude: data.longitude && String(data.longitude).trim() !== '' ? String(data.longitude) : null,
+        categoryId: data.categoryId && data.categoryId !== 'null' ? data.categoryId : null,
         temporaryCloseReason: data.isTemporarilyClosed ? (data.temporaryCloseReason || null) : null,
       };
       const response = await apiRequest('PUT', `/api/admin/restaurants/${id}`, submitData);
@@ -263,18 +261,6 @@ export default function AdminRestaurants() {
       toast({
         title: "خطأ",
         description: "يرجى إدخال وقت التوصيل",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate numeric fields
-    const commissionRate = parseFloat(formData.commissionRate);
-
-    if (isNaN(commissionRate) || commissionRate < 0 || commissionRate > 100) {
-      toast({
-        title: "خطأ",
-        description: "يرجى إدخال نسبة عمولة صحيحة (0-100)",
         variant: "destructive",
       });
       return;
@@ -495,7 +481,7 @@ export default function AdminRestaurants() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div>
                   <Label htmlFor="deliveryTime">وقت التوصيل</Label>
                   <Input
@@ -505,20 +491,6 @@ export default function AdminRestaurants() {
                     placeholder="30-45 دقيقة"
                     required
                     data-testid="input-restaurant-delivery-time"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="commissionRate">نسبة عمولة الشركة (%)</Label>
-                  <Input
-                    id="commissionRate"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    value={formData.commissionRate}
-                    onChange={(e) => setFormData(prev => ({ ...prev, commissionRate: e.target.value }))}
-                    data-testid="input-restaurant-commission-rate"
                   />
                 </div>
               </div>

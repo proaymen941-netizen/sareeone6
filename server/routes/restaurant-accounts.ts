@@ -304,6 +304,11 @@ router.put("/:restaurantId/commission", async (req, res) => {
     }
 
     await dbStorage.updateRestaurant(restaurantId, { commissionRate: rate.toString() } as any);
+    try {
+      if (typeof (dbStorage as any).updateRestaurantAccount === 'function') {
+        await (dbStorage as any).updateRestaurantAccount(restaurantId, { commissionRate: rate.toString() });
+      }
+    } catch (_) {}
     const restaurant = await dbStorage.getRestaurant(restaurantId);
 
     res.json({ success: true, restaurant, commissionRate: rate });

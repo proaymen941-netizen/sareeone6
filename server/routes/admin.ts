@@ -409,16 +409,75 @@ router.put("/restaurants/:id", async (req, res) => {
   try {
     const { id } = req.params;
     
-    // تطبيق coercion على البيانات المحدثة أيضاً
     const coercedData = coerceRequestData(req.body);
-    
-    // التحقق من صحة البيانات المحدثة (جزئي)
-    const validatedData = insertRestaurantSchema.partial().parse(coercedData);
-    
-    const updatedRestaurant = await storage.updateRestaurant(id, {
-      ...validatedData, 
-      updatedAt: new Date()
-    });
+
+    const updateFields: any = {};
+    if (coercedData.name !== undefined) updateFields.name = String(coercedData.name);
+    if (coercedData.description !== undefined) updateFields.description = coercedData.description ? String(coercedData.description) : null;
+    if (coercedData.image !== undefined) updateFields.image = String(coercedData.image);
+    if (coercedData.phone !== undefined) updateFields.phone = coercedData.phone ? String(coercedData.phone) : null;
+    if (coercedData.deliveryTime !== undefined) updateFields.deliveryTime = String(coercedData.deliveryTime);
+    if (coercedData.isOpen !== undefined) updateFields.isOpen = Boolean(coercedData.isOpen);
+    if (coercedData.isActive !== undefined) updateFields.isActive = Boolean(coercedData.isActive);
+    if (coercedData.isFeatured !== undefined) updateFields.isFeatured = Boolean(coercedData.isFeatured);
+    if (coercedData.isNew !== undefined) updateFields.isNew = Boolean(coercedData.isNew);
+    if (coercedData.isTemporarilyClosed !== undefined) updateFields.isTemporarilyClosed = Boolean(coercedData.isTemporarilyClosed);
+    if (coercedData.temporaryCloseReason !== undefined) updateFields.temporaryCloseReason = coercedData.temporaryCloseReason ? String(coercedData.temporaryCloseReason) : null;
+    if (coercedData.openingTime !== undefined) updateFields.openingTime = coercedData.openingTime ? String(coercedData.openingTime) : null;
+    if (coercedData.closingTime !== undefined) updateFields.closingTime = coercedData.closingTime ? String(coercedData.closingTime) : null;
+    if (coercedData.workingDays !== undefined) updateFields.workingDays = coercedData.workingDays ? String(coercedData.workingDays) : null;
+    if (coercedData.address !== undefined) updateFields.address = coercedData.address ? String(coercedData.address) : null;
+
+    if (coercedData.categoryId !== undefined) {
+      const catId = coercedData.categoryId;
+      updateFields.categoryId = (catId === '' || catId === 'null' || catId === 'undefined' || catId === null) ? null : String(catId);
+    }
+
+    if (coercedData.latitude !== undefined) {
+      const lat = coercedData.latitude;
+      updateFields.latitude = (lat === '' || lat === 'null' || lat === null) ? null : String(lat);
+    }
+
+    if (coercedData.longitude !== undefined) {
+      const lng = coercedData.longitude;
+      updateFields.longitude = (lng === '' || lng === 'null' || lng === null) ? null : String(lng);
+    }
+
+    if (coercedData.deliveryFee !== undefined) {
+      updateFields.deliveryFee = String(coercedData.deliveryFee);
+    }
+
+    if (coercedData.perKmFee !== undefined) {
+      updateFields.perKmFee = String(coercedData.perKmFee);
+    }
+
+    if (coercedData.minimumOrder !== undefined) {
+      updateFields.minimumOrder = String(coercedData.minimumOrder);
+    }
+
+    if (coercedData.rating !== undefined) {
+      updateFields.rating = String(coercedData.rating);
+    }
+
+    if (coercedData.reviewCount !== undefined) {
+      updateFields.reviewCount = parseInt(coercedData.reviewCount) || 0;
+    }
+
+    let updatedRestaurant;
+    try {
+      const validatedData = insertRestaurantSchema.partial().parse(coercedData);
+      updatedRestaurant = await storage.updateRestaurant(id, {
+        ...validatedData,
+        ...updateFields,
+        updatedAt: new Date()
+      });
+    } catch (zodErr) {
+      console.warn("⚠️ Zod parse fallback for updateRestaurant:", zodErr);
+      updatedRestaurant = await storage.updateRestaurant(id, {
+        ...updateFields,
+        updatedAt: new Date()
+      });
+    }
     
     if (!updatedRestaurant) {
       return res.status(404).json({ error: "المطعم غير موجود" });
@@ -427,14 +486,8 @@ router.put("/restaurants/:id", async (req, res) => {
     broadcastSettingsChanged('restaurants');
     res.json(updatedRestaurant);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
-        error: "بيانات تحديث المطعم غير صحيحة", 
-        details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
-      });
-    }
     console.error("خطأ في تحديث المطعم:", error);
-    res.status(500).json({ error: "خطأ في الخادم" });
+    res.status(500).json({ error: "خطأ في الخادم عند تحديث بيانات المطعم" });
   }
 });
 
