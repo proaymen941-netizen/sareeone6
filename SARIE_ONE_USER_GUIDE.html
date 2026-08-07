@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>الدليل التشغيلي الموحد - نظام السريع ون (Sarie One) | تطوير شركة إتقان سوفت</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #ea580c;
+      --primary-dark: #c2410c;
+      --primary-light: #ffedd5;
+      --secondary: #0f172a;
+      --secondary-light: #1e293b;
+      --accent: #059669;
+      --accent-light: #d1fae5;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 10px 25px -5px rgba(15, 23, 42, 0.12);
+      --radius: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.8;
+      padding-bottom: 60px;
+    }
+
+    /* Top Banner / Header */
+    header {
+      background: linear-gradient(135deg, var(--secondary) 0%, var(--secondary-light) 100%);
+      color: #ffffff;
+      padding: 28px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.25);
+      border-bottom: 4px solid var(--primary);
+    }
+
+    .header-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .logo-box {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logo-icon {
+      background: linear-gradient(135deg, var(--primary) 0%, #f97316 100%);
+      color: white;
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: 900;
+      box-shadow: 0 4px 14px rgba(234, 88, 12, 0.4);
+    }
+
+    .logo-text h1 {
+      font-size: 24px;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: -0.5px;
+    }
+
+    .logo-text p {
+      font-size: 13.5px;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+
+    .company-badge {
+      background: rgba(234, 88, 12, 0.15);
+      border: 1px solid rgba(234, 88, 12, 0.4);
+      color: #fdba74;
+      padding: 8px 18px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border-radius: 12px;
+      font-weight: 800;
+      font-size: 13.5px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 4px 12px rgba(234, 88, 12, 0.35);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+      transform: translateY(-2px);
+    }
+
+    .btn-outline {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Live Search Section */
+    .search-section {
+      background: white;
+      border-bottom: 1px solid var(--border);
+      padding: 18px 24px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .search-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .search-input-box {
+      flex: 1;
+      position: relative;
+    }
+
+    .search-input-box input {
+      width: 100%;
+      padding: 14px 18px 14px 44px;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      font-size: 14.5px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-input-box input:focus {
+      border-color: var(--primary);
+    }
+
+    /* Main Container Layout */
+    .container {
+      max-width: 1200px;
+      margin: 32px auto;
+      padding: 0 20px;
+    }
+
+    /* Tab Switcher Bar */
+    .tabs-nav {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 14px;
+      margin-bottom: 32px;
+    }
+
+    .tab-btn {
+      background: white;
+      border: 2px solid var(--border);
+      padding: 20px 22px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      text-align: right;
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .tab-btn:hover {
+      border-color: var(--primary-light);
+      background: #fffaf5;
+    }
+
+    .tab-btn.active {
+      border-color: var(--primary);
+      background: #fff7ed;
+      box-shadow: 0 6px 18px rgba(234, 88, 12, 0.18);
+    }
+
+    .tab-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn.active .tab-icon {
+      background: var(--primary);
+      color: white;
+    }
+
+    .tab-title {
+      font-weight: 800;
+      font-size: 16px;
+      color: var(--secondary);
+    }
+
+    .tab-sub {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Tab Contents */
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Section Cards & Layout Grids */
+    .section-card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 30px;
+      margin-bottom: 28px;
+      box-shadow: var(--shadow-md);
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 22px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #f1f5f9;
+    }
+
+    .section-header h2 {
+      font-size: 21px;
+      font-weight: 900;
+      color: var(--secondary);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      background: var(--primary-light);
+      color: var(--primary-dark);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12.5px;
+      font-weight: 800;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 22px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .sub-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 22px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .sub-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.05);
+      border-color: #cbd5e1;
+    }
+
+    .sub-card h3 {
+      font-size: 16.5px;
+      font-weight: 800;
+      color: var(--secondary);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sub-card p {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+
+    /* List Steps */
+    .step-list {
+      list-style: none;
+      counter-reset: step-counter;
+    }
+
+    .step-list li {
+      counter-increment: step-counter;
+      position: relative;
+      padding-right: 38px;
+      margin-bottom: 14px;
+      font-size: 14px;
+      color: var(--text-main);
+    }
+
+    .step-list li::before {
+      content: counter(step-counter);
+      position: absolute;
+      right: 0;
+      top: 2px;
+      width: 26px;
+      height: 26px;
+      background: var(--primary);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12.5px;
+      font-weight: 900;
+    }
+
+    /* Accordion FAQ Component */
+    .accordion {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 14px;
+      overflow: hidden;
+      background: white;
+    }
+
+    .accordion-header {
+      padding: 18px 22px;
+      background: #f8fafc;
+      cursor: pointer;
+      font-weight: 800;
+      font-size: 15.5px;
+      color: var(--secondary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+      transition: background-color 0.2s;
+    }
+
+    .accordion-header:hover {
+      background: #f1f5f9;
+    }
+
+    .accordion-content {
+      padding: 22px;
+      display: none;
+      border-top: 1px solid var(--border);
+      font-size: 14.5px;
+      color: var(--text-main);
+      line-height: 1.8;
+    }
+
+    .accordion.open .accordion-content {
+      display: block;
+    }
+
+    /* Data Table Styling */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 14px;
+    }
+
+    .data-table th, .data-table td {
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      text-align: right;
+    }
+
+    .data-table th {
+      background: var(--secondary);
+      color: white;
+      font-weight: 800;
+    }
+
+    .data-table tr:nth-child(even) {
+      background: #f8fafc;
+    }
+
+    /* Callout Highlight Boxes */
+    .info-box {
+      background: #eff6ff;
+      border-right: 5px solid #3b82f6;
+      padding: 18px;
+      border-radius: 12px;
+      margin: 18px 0;
+      font-size: 14px;
+      color: #1e40af;
+    }
+
+    .warning-box {
+      background: #fffbebf1;
+      border-right: 5px solid #f59e0b;
+      padding: 18px;
+      border-radius: 12px;
+      margin: 18px 0;
+      font-size: 14px;
+      color: #92400e;
+    }
+
+    .success-box {
+      background: #f0fdf4;
+      border-right: 5px solid #22c55e;
+      padding: 18px;
+      border-radius: 12px;
+      margin: 18px 0;
+      font-size: 14px;
+      color: #166534;
+    }
+
+    /* Footer Styling */
+    footer {
+      background: var(--secondary);
+      color: #94a3b8;
+      padding: 44px 20px;
+      margin-top: 60px;
+      text-align: center;
+      border-top: 4px solid var(--primary);
+    }
+
+    footer h3 {
+      color: white;
+      font-size: 20px;
+      margin-bottom: 8px;
+      font-weight: 900;
+    }
+
+    footer p {
+      font-size: 14px;
+      margin-bottom: 18px;
+    }
+
+    .itqan-rights {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      display: inline-block;
+      padding: 12px 28px;
+      border-radius: 30px;
+      color: #fdba74;
+      font-weight: 800;
+      font-size: 13.5px;
+    }
+
+    /* Print Optimization */
+    @media print {
+      header, .search-section, .tabs-nav, .header-actions, footer button {
+        display: none !important;
+      }
+
+      body {
+        background: white;
+        color: black;
+      }
+
+      .container {
+        max-width: 100%;
+        margin: 0;
+        padding: 0;
+      }
+
+      .tab-content {
+        display: block !important;
+        page-break-after: always;
+      }
+
+      .accordion-content {
+        display: block !important;
+      }
+
+      .section-card {
+        box-shadow: none;
+        border: 1px solid #ccc;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header Section -->
+  <header>
+    <div class="header-container">
+      <div class="logo-box">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">
+          <h1>نظام السريع ون (Sarie One)</h1>
+          <p>الدليل الشامل والكتالوج المرجعي لإدارة النظام وتطبيقات السائق والعميل</p>
+        </div>
+      </div>
+
+      <div class="company-badge">
+        ✨ تطوير وتصميم: شركة إتقان سوفت (Itqan Soft)
+      </div>
+
+      <div class="header-actions">
+        <button onclick="window.print()" class="btn btn-primary">
+          🖨️ طباعة الدليل / حفظ PDF
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Live Search Filter Section -->
+  <div class="search-section">
+    <div class="search-container">
+      <div class="search-input-box">
+        <input type="text" id="manualSearch" placeholder="🔍 ابحث عن أي شاشة، وظيفة، أو طريقة عمل في الدليل..." onkeyup="filterGuide()">
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="container">
+
+    <!-- Navigation Tabs Switcher -->
+    <div class="tabs-nav">
+      <div class="tab-btn active" onclick="switchTab('admin')">
+        <div class="tab-icon">🏢</div>
+        <div>
+          <div class="tab-title">لوحة تحكم الإدارة</div>
+          <div class="tab-sub">إدارة النظام، المتاجر والماليات</div>
+        </div>
+      </div>
+
+      <div class="tab-btn" onclick="switchTab('driver')">
+        <div class="tab-icon">🚚</div>
+        <div>
+          <div class="tab-title">تطبيق السائق</div>
+          <div class="tab-sub">استقبال الطلبات والتوصيل والأرباح</div>
+        </div>
+      </div>
+
+      <div class="tab-btn" onclick="switchTab('customer')">
+        <div class="tab-icon">📱</div>
+        <div>
+          <div class="tab-title">تطبيق العميل</div>
+          <div class="tab-sub">التصفح، الطلب والمحفظة</div>
+        </div>
+      </div>
+
+      <div class="tab-btn" onclick="switchTab('system')">
+        <div class="tab-icon">🔑</div>
+        <div>
+          <div class="tab-title">بيانات الدخول والنظام</div>
+          <div class="tab-sub">الحسابات التجريبية وحقوق إتقان سوفت</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 1: ADMIN DASHBOARD MANUAL                                             -->
+    <!-- ========================================================================= -->
+    <div id="tab-admin" class="tab-content active">
+
+      <div class="section-card searchable-item">
+        <div class="section-header">
+          <h2>🏢 1. دليل لوحة تحكم مدير النظام (Admin Dashboard)</h2>
+          <span class="badge">التحكم المركزي الكامل</span>
+        </div>
+        <p>تُعتبر لوحة تحكم الإدارة في نظام "السريع ون" العصب الرئيسي لإدارة وتسيير جميع العمليات التشغيلية والمالية. تتيح للمديرين متابعة الطلبات المباشرة لايف، ضبط إعدادات المتاجر والمطاعم، استخراج كشوفات حسابات المتاجر والمحافظ الإلكترونية، وإدارة أسطول السائقين بكفاءة عالية.</p>
+
+        <div class="info-box">
+          📌 <strong>طريقة الوصول للوحة الإدارة:</strong> اضغط على رابط لوحة التحكم في أسفل الموقع أو توجه إلى المسار <code>/admin-login</code> للولوج بحساب المدير الرئيسي.
+        </div>
+      </div>
+
+      <div class="grid-2">
+
+        <!-- Orders & Live Tracking -->
+        <div class="sub-card searchable-item">
+          <h3>📦 إدارة الطلبات والتتبع المباشر</h3>
+          <p>شاشة تفاعلية حية تمكن الإدارة من معالجة ومتابعة جميع الطلبيات الواردة من العملاء.</p>
+          <ul class="step-list">
+            <li><strong>تصفح الحالات:</strong> تقسيم الطلبات حسب (جديد، قيد التجهيز، جاري التوصيل، مكتمل، ملغى).</li>
+            <li><strong>تعيين السائقين:</strong> إسناد الطلب لسائق محدد يدويًا أو ترك الفرصة للإسناد التنافسي التلقائي.</li>
+            <li><strong>تنبيه الطلبات المتأخرة:</strong> إصدار تنبيه صوتي ومرئي للطلبات المعلقة أكثر من 15 دقيقة بدون سائق.</li>
+            <li><strong>التتبع الجغرافي الحي:</strong> مشاهدة خط سير السائق على الخريطة مباشرة أثناء عملية التوصيل.</li>
+          </ul>
+        </div>
+
+        <!-- Stores & Menu Items -->
+        <div class="sub-card searchable-item">
+          <h3>🏪 إدارة المتاجر والمطاعم والأصناف</h3>
+          <p>أدوات كاملة لإضافة وتحديث المتاجر وقوائم الطعام والوجبات والأسعار.</p>
+          <ul class="step-list">
+            <li><strong>إضافة متجر جديد:</strong> إدخال اسم المتجر، الشعار، الغلاف، ونسبة عمولة التطبيق المتفق عليها.</li>
+            <li><strong>تقسيم الأقسام (Sections):</strong> تصنيف الوجبات والمشروبات والحلويات داخل متجر معين.</li>
+            <li><strong>قائمة الأصناف (Menu Items):</strong> تعديل صور الوجبات، الأسعار، الخيارات، والأحجام.</li>
+            <li><strong>الحالة التشغيلية:</strong> فتح/إغلاق المتجر مؤقتًا أو تغيير ساعات العمل.</li>
+          </ul>
+        </div>
+
+        <!-- Financial Ledger -->
+        <div class="sub-card searchable-item">
+          <h3>📊 كشوفات حسابات المتاجر (Financial Ledger)</h3>
+          <p>نظام محاسبي متكامل لحساب مبيعات وعمولات وتسويات المتاجر بكل دقة.</p>
+          <ul class="step-list">
+            <li><strong>كشف الحساب التفصيلي:</strong> عرض إجمالي المبيعات، عمولة السريع ون، والمبلغ الصافي المستحق للمتجر.</li>
+            <li><strong>تسجيل التسويات والمدفوعات:</strong> إضافة مبالغ محولة لحساب المتجر مع أرقام الحوالات والأشعار.</li>
+            <li><strong>تحديث الرصيد الفوري:</strong> انعكاس تلقائي مباشر في قاعدة البيانات مع حفظ القيود المعتمدة.</li>
+          </ul>
+        </div>
+
+        <!-- Wallets & Driver Withdrawals -->
+        <div class="sub-card searchable-item">
+          <h3>💳 إدارة المحافظ المالية وطلبات السحب</h3>
+          <p>التحكم الكامل بمحافظ السائقين والعملاء ومعالجة سحوبات الأرباح.</p>
+          <ul class="step-list">
+            <li><strong>محافظ السائقين:</strong> عرض الرصيد المتاح للسحب، الرصيد المكتسب، وإجمالي المبالغ المسحوبة.</li>
+            <li><strong>معالجة طلبيات السحب:</strong> مراجعة طلبات السحب المقدمة من السائقين (موافقة وسداد أو رفض).</li>
+            <li><strong>محافظ العملاء ونقاط الولاء:</strong> شحن محفظة العميل يدويًا وإدارة نقاط المكافآت والولاء.</li>
+          </ul>
+        </div>
+
+        <!-- Driver Fleet Management -->
+        <div class="sub-card searchable-item">
+          <h3>🚚 إدارة أسطول السائقين والتوثيق</h3>
+          <p>سجل شامل لحسابات وبيانات السائقين والوثائق والتقييمات.</p>
+          <ul class="step-list">
+            <li><strong>إضافة سائق جديد:</strong> تسجيل بيانات الاسم، الهاتف، كلمة السر، ونوع المركبة.</li>
+            <li><strong>نسبة العمولة:</strong> تحديد نسبة السائق من توصيل الطلبيات أو راتبه المقطوع.</li>
+            <li><strong>تفعيل وتجميد الحسابات:</strong> إمكانية إيقاف السائقين المخالفين للتعليمات فورًا.</li>
+          </ul>
+        </div>
+
+        <!-- Marketing & Discounts -->
+        <div class="sub-card searchable-item">
+          <h3>🎟️ العروض، كودات الخصم والبنرات</h3>
+          <p>إدارة الأدوات التسويقية لزيادة المبيعات وجذب المزيد من العملاء.</p>
+          <ul class="step-list">
+            <li><strong>كوبونات الخصم:</strong> إنشاء أكواد خصم بنسبة مئوية (%) أو مبلغ ثابت (ريال).</li>
+            <li><strong>قيود الكوبون:</strong> تحديد الحد الأدنى للشراء، عدد مرات الاستخدام، وتاريخ الانتهاء.</li>
+            <li><strong>البنرات الإعلانية:</strong> رفع الصور الترويجية المتحركة للشاشة الرئيسية في تطبيق العميل.</li>
+          </ul>
+        </div>
+
+      </div>
+
+      <!-- FAQ Accordions -->
+      <div class="section-card searchable-item" style="margin-top: 24px;">
+        <div class="section-header">
+          <h2>الأسئلة التشغيلية والإجراءات المتقدمة في لوحة الإدارة</h2>
+        </div>
+
+        <div class="accordion">
+          <div class="accordion-header" onclick="toggleAccordion(this)">
+            كيف يتم إضافة مدير فرعي (Sub-Admin) وتحديد صلاحياته؟ <span>▼</span>
+          </div>
+          <div class="accordion-content">
+            تجه إلى شاشة "إدارة المديرين الفرعيين" من القائمة الجانبية، ثم اضغط على "إضافة مدير فرعي". قم بإدخال بيانات الاسم، الهاتف، البريد الإلكتروني، وكلمة السر، ثم حدد الصلاحيات المطلوبة (مثل: صلاحية إدارة الطلبات فقط، أو إدارة المتاجر فقط، أو الاطلاع على التقارير المالية).
+          </div>
+        </div>
+
+        <div class="accordion">
+          <div class="accordion-header" onclick="toggleAccordion(this)">
+            كيف يتم تسجيل دفعة سداد لحساب متجر وتصفية مستحقاته؟ <span>▼</span>
+          </div>
+          <div class="accordion-content">
+            من لوحة التحكم -> اختر "حسابات المتاجر" -> حدد المتجر المطلوب -> اضغط على "تسجيل دفعية / تسوية". قم بإدخال المبلغ السداد، رقم السند أو الحوالة، وسبب التسوية. سيقوم النظام فورًا بخصم المبلغ المخصوم من الرصيد المتبقي للمتجر وتحديث القيود المحاسبية.
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 2: DRIVER APP MANUAL                                                  -->
+    <!-- ========================================================================= -->
+    <div id="tab-driver" class="tab-content">
+
+      <div class="section-card searchable-item">
+        <div class="section-header">
+          <h2>🚚 2. دليل تطبيق السائق (Driver App Manual)</h2>
+          <span class="badge">تنفيذ وتوصيل الطلبيات</span>
+        </div>
+        <p>تطبيق السائق مخصص لأفراد أسطول التوصيل في نظام "السريع ون". يتيح للكبائن والسائقين التواجد اونلاين، استقبال الطلبيات القريبة، توجيه الخرائط نحو المتجر والعميل، ومتابعة الأرباح المسجلة بالمحفظة.</p>
+
+        <div class="success-box">
+          📱 <strong>تسجيل دخول السائق:</strong> افتح التطبيق وحدد "تسجيل دخول سائق" أو توجه إلى <code>/driver-login</code> ثم أدخل رقم الجوال وكلمة السر المعتمدة من الإدارة.
+        </div>
+      </div>
+
+      <div class="grid-3">
+
+        <div class="sub-card searchable-item">
+          <h3>1️⃣ البدء والاتصال (Online)</h3>
+          <p>افتح التطبيق وقم بتفعيل مفتاح <strong>"متصل الآن"</strong> لتصبح نَشطًا ومؤهلاً لاستقبال طلبيات التوصيل القريبة من موقعك الجغرافي.</p>
+        </div>
+
+        <div class="sub-card searchable-item">
+          <h3>2️⃣ استقبال وقبول الطلب</h3>
+          <p>عند وصول طلب جديد، يصلك إشعار صوتي ومرئي يحتوي على اسم المتجر، مسافة التوصيل، وقيمة عمولتك المستحقة. اضغط <strong>"قبول الطلب"</strong>.</p>
+        </div>
+
+        <div class="sub-card searchable-item">
+          <h3>3️⃣ الاستلام من المتجر</h3>
+          <p>توجه لموقع المتجر الظاهر في الخريطة، وعند استلام الوجبة أو الشحنة قم بالضغط على زر <strong>"تم الاستلام من المتجر"</strong>.</p>
+        </div>
+
+        <div class="sub-card searchable-item">
+          <h3>4️⃣ التوجه والاتصال بالعميل</h3>
+          <p>تتبع المسار نحو موقع العميل الموضح عبر الخريطة لايف. يمكنك الاتصال بالعميل مباشرًا عبر الهاتف أو الدردشة داخل التطبيق.</p>
+        </div>
+
+        <div class="sub-card searchable-item">
+          <h3>5️⃣ التسليم وتحصيل المبلغ</h3>
+          <p>سلم الوجبة للعميل وحصل المبلغ المطلوب (إذا كان دفع عند الاستلام)، ثم اضغط <strong>"تم التسليم بنجاح"</strong> لإتاحة تحويل أرباحك لمحفظتك.</p>
+        </div>
+
+        <div class="sub-card searchable-item">
+          <h3>6️⃣ المحفظة وسحب الأرباح</h3>
+          <p>استعرض رصيدك المتاح وطلبات السحب السابق تقديمها. يمكنك إضافة حسابك البنكي وتقديم طلب سحب أرباحك للإدارة في أي وقت.</p>
+        </div>
+
+      </div>
+
+      <!-- Driver Workflow Summary Table -->
+      <div class="section-card searchable-item" style="margin-top: 24px;">
+        <div class="section-header">
+          <h2>مراحل حالة الطلب في تطبيق السائق</h2>
+        </div>
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>حالة الطلب</th>
+              <th>الإجراء المطلوب من السائق</th>
+              <th>تأثير العملية على النظام والعميل</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>جديد (Pending)</strong></td>
+              <td>الموافقة والضغط على "قبول الطلب"</td>
+              <td>حجز الطلب للسائق وإشعار العميل باسم ورقم السائق</td>
+            </tr>
+            <tr>
+              <td><strong>جاري التجهيز (Preparing)</strong></td>
+              <td>التوجه للمتجر والانتظار لحين تجهيز الوجبة</td>
+              <td>متابعة موقع السائق الحيوية عبر الخريطة</td>
+            </tr>
+            <tr>
+              <td><strong>تم الاستلام (Picked Up)</strong></td>
+              <td>استلام الطلب والضغط على "تم الاستلام"</td>
+              <td>تحديث حالة الطلب وإشعار العميل بأن الوجبة في الطريق إليه</td>
+            </tr>
+            <tr>
+              <td><strong>مكتمل (Delivered)</strong></td>
+              <td>تسليم الطلب للعميل والضغط على "تم التوصيل"</td>
+              <td>قيد عمولة التوصيل فورًا في محفظة السائق وإغلاق الطلب</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 3: CUSTOMER APP MANUAL                                                -->
+    <!-- ========================================================================= -->
+    <div id="tab-customer" class="tab-content">
+
+      <div class="section-card searchable-item">
+        <div class="section-header">
+          <h2>📱 3. دليل تطبيق العميل (Customer App Manual)</h2>
+          <span class="badge">تجربة التصفح والطلب السريع</span>
+        </div>
+        <p>يوفر تطبيق "السريع ون" تجربة تسوق وطلب وجبات حديثة وسريعة للعملاء، تتيح لهم تصفح المتاجر، تخصيص الأصناف، خيارات الدفع المتعددة، تتبع السائق لايف عبر الخريطة، الاستفادة من المحفظة ونقاط الولاء، وخدمة توصيل الأغراض الخاصة (وصل لي).</p>
+      </div>
+
+      <div class="grid-2">
+
+        <div class="sub-card searchable-item">
+          <h3>🍔 1. التصفح والبحث عن المطاعم</h3>
+          <p>استعرض المطاعم القريبة بحسب التصنيفات (مطاعم، كافيهات، حلويات، سوبرماركت) أو استخدم محرك البحث للوصول لأكلتك المفضلة.</p>
+        </div>
+
+        <div class="sub-card searchable-item">
+          <h3>🛒 2. تخصيص الوجبة وإضافتها للسلة</h3>
+          <p>اختر الحجم (صغير/وسط/كبير) والإضافات المفضلة والمشروبات، ثم أضف الصنف لسلة التسوق واكتب ملاحظاتك الخاصة للمطعم.</p>
+        </div>
+
+        <div class="sub-card searchable-item">
+          <h3>📍 3. تحديد موقع التوصيل والخصم</h3>
+          <p>حدد موقعك تلقائيًا عبر الخريطة أو اختر من العناوين المحفوظة سابقاً، ثم أدخل كود الخصم (إن وجد) لتطبيق التخفيض الفوري.</p>
+        </div>
+
+        <div class="sub-card searchable-item">
+          <h3>💵 4. خيارات الدفع المتاحة</h3>
+          <p>يدعم التطبيق الدفع نقدًا عند الاستلام (COD) أو الدفع المباشر الخصم من محفظتك الإلكترونية المسجلة في السريع ون.</p>
+        </div>
+
+        <div class="sub-card searchable-item">
+          <h3>📡 5. التتبع الجغرافي لايف (Live Order Tracking)</h3>
+          <p>شريط تفاعلي يعرض مراحل الطلب لحظة بلحظة (قبول -> تجهيز -> استلام -> توصيل) مع خريطة حية لموقع السائق على الطريق.</p>
+        </div>
+
+        <div class="sub-card searchable-item">
+          <h3>🎁 6. المحفظة، نقاط الولاء وخدمة "وصل لي"</h3>
+          <p>استبدل نقاط الولاء المكتسبة مع كل طلب برصيد نقدي بمحفظتك، واستخدم خدمة "وصل لي" لإرسال أو استلام أي طرد خاص من مكان لآخر.</p>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 4: CREDENTIALS & ITQAN SOFT COPYRIGHTS                                -->
+    <!-- ========================================================================= -->
+    <div id="tab-system" class="tab-content">
+
+      <div class="section-card searchable-item">
+        <div class="section-header">
+          <h2>🔑 4. بيانات الولوج والاختبار للنظام</h2>
+          <span class="badge">الحسابات الافتراضية التجريبية</span>
+        </div>
+        <p>يمكن اختبار واستخدام النظام في البيئة التجريبية بكافة أدواره التشغيلية باستخدام بيانات الدخول المعتمدة التالية:</p>
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>الدور التشغيلي (Role)</th>
+              <th>اسم المستخدم / البريد / الهاتف</th>
+              <th>كلمة السر (Password)</th>
+              <th>نطاق الصلاحيات</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>مدير النظام الرئيسي (Admin)</strong></td>
+              <td><code>admin@alsarie-one.com</code></td>
+              <td><code>123456</code></td>
+              <td>إدارة كاملة للنظام، المتاجر، المحافظ والسائقين والتقارير</td>
+            </tr>
+            <tr>
+              <td><strong>السائق التجريبي (Driver)</strong></td>
+              <td><code>0500000000</code></td>
+              <td><code>123456</code></td>
+              <td>تطبيق السائق، استقبال التوصيل والأرباح والمحفظة</td>
+            </tr>
+            <tr>
+              <td><strong>العميل التجريبي (Customer)</strong></td>
+              <td><code>0500000001</code></td>
+              <td><code>123456</code></td>
+              <td>تطبيق العميل، التصفح، الطلب، والمحفظة وتتبع الخريطة</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Itqan Soft Copyright Notice Box -->
+      <div class="section-card searchable-item" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white; border: 2px solid var(--primary);">
+        <div style="display: flex; align-items: center; gap: 18px; margin-bottom: 18px;">
+          <div style="font-size: 42px;">💎</div>
+          <div>
+            <h2 style="color: white; font-size: 23px; font-weight: 900;">حقوق التطوير والملكية البرمجية</h2>
+            <p style="color: #fdba74; font-size: 15px; font-weight: 800; margin-top: 2px;">شركة إتقان سوفت للحلول البرمجية المتكاملة (Itqan Soft)</p>
+          </div>
+        </div>
+        <p style="color: #cbd5e1; font-size: 14.5px; line-height: 1.8;">
+          تم تطوير وبناء كافة تطبيقات، أنظمة، قواعد بيانات، وواجهات نظام <strong>السريع ون (Sarie One)</strong> بواسطة <strong>شركة إتقان سوفت</strong> وفق أحدث تقنيات الويب والتطبيقات الذكية. يغطي هذا النظام لوحة تحكم الإدارة الشاملة، نظام الحسابات والمحافظ، التتبع الحي للخرائط، وتطبيقات السائق والعميل.
+        </p>
+        <div style="margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.12); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; font-size: 13.5px; color: #94a3b8;">
+          <span>© جميع الحقوق محفوظة - شركة إتقان سوفت 2026</span>
+          <span>الإصدار المعتمد للنظام: v2.5.0 - السريع ون</span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <h3>نظام السريع ون (Sarie One) للتوصيل الذكي</h3>
+    <p>الدليل الاسترشادي والتشغيلي الموحد للإدارة والسائقين والعملاء</p>
+    <div class="itqan-rights">
+      تطوير وتصميم: شركة إتقان سوفت (Itqan Soft)
+    </div>
+  </footer>
+
+  <!-- Embedded JavaScript -->
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+      const selectedBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn => btn.getAttribute('onclick').includes(tabId));
+      if (selectedBtn) selectedBtn.classList.add('active');
+
+      const selectedContent = document.getElementById('tab-' + tabId);
+      if (selectedContent) selectedContent.classList.add('active');
+    }
+
+    function toggleAccordion(header) {
+      const accordion = header.parentElement;
+      accordion.classList.toggle('open');
+    }
+
+    function filterGuide() {
+      const query = document.getElementById('manualSearch').value.toLowerCase().trim();
+      const items = document.querySelectorAll('.searchable-item');
+
+      if (!query) {
+        items.forEach(item => item.style.display = '');
+        return;
+      }
+
+      items.forEach(item => {
+        const text = item.textContent.toLowerCase();
+        if (text.includes(query)) {
+          item.style.display = '';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    }
+  </script>
+</body>
+</html>
