@@ -65,8 +65,18 @@ router.get("/admin/conversations", async (req, res) => {
 // Send a new message
 router.post("/", async (req, res) => {
   try {
-    const validatedData = insertMessageSchema.parse(req.body);
-    const message = await storage.createMessage(validatedData);
+    const payload = {
+      ...req.body,
+      orderId: req.body.orderId || null,
+      senderId: String(req.body.senderId || '').trim(),
+      receiverId: String(req.body.receiverId || '').trim(),
+      senderType: String(req.body.senderType || '').trim(),
+      receiverType: String(req.body.receiverType || '').trim(),
+      content: String(req.body.content || '').trim(),
+    };
+
+    const validatedData = insertMessageSchema.parse(payload);
+    const message = await storage.createMessage(validatedData as any);
     
     // Broadcast via WebSocket if available
     const ws = (req as any).app?.get('ws');

@@ -1203,20 +1203,26 @@ export type InsertDeliveryDiscount = z.infer<typeof insertDeliveryDiscountSchema
 // Messages table for chat
 export const messages = pgTable("messages", {
   id: uuid("id").primaryKey().defaultRandom(),
-  orderId: uuid("order_id").references(() => orders.id),
-  senderId: uuid("sender_id").notNull(),
+  orderId: text("order_id"),
+  senderId: text("sender_id").notNull(),
   senderType: varchar("sender_type", { length: 50 }).notNull(), // customer, driver, restaurant, admin
-  receiverId: uuid("receiver_id").notNull(),
+  receiverId: text("receiver_id").notNull(),
   receiverType: varchar("receiver_type", { length: 50 }).notNull(), // customer, driver, restaurant, admin
   content: text("content").notNull(),
   isRead: boolean("is_read").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertMessageSchema = createInsertSchema(messages).partial({
-  id: true,
-  createdAt: true,
-  isRead: true,
+export const insertMessageSchema = z.object({
+  id: z.string().optional(),
+  orderId: z.string().nullable().optional(),
+  senderId: z.string().min(1, "معرف المرسل مطلوب"),
+  senderType: z.string().min(1, "نوع المرسل مطلوب"),
+  receiverId: z.string().min(1, "معرف المستقبل مطلوب"),
+  receiverType: z.string().min(1, "نوع المستقبل مطلوب"),
+  content: z.string().min(1, "محتوى الرسالة لا يمكن أن يكون فارغاً"),
+  isRead: z.boolean().optional(),
+  createdAt: z.union([z.date(), z.string()]).optional(),
 });
 export const selectMessageSchema = createSelectSchema(messages);
 export type Message = z.infer<typeof selectMessageSchema>;

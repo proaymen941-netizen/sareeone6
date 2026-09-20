@@ -28,18 +28,18 @@ export default function ChatOverlay({ isOpen, onClose, userType }: ChatOverlayPr
   const [message, setMessage] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const userId = user?.id;
+  const effectiveUserId = user?.id || user?.phone || (userType === 'driver' ? (localStorage.getItem('driver_phone') || 'driver_guest') : (localStorage.getItem('customer_phone') || 'customer_guest'));
 
   const { data: messages = [], isLoading, refetch } = useQuery({
-    queryKey: ['/api/chat/admin', userId],
+    queryKey: ['/api/chat/admin', effectiveUserId, userType],
     queryFn: async () => {
-      if (!userId) return [];
-      const res = await fetch(`/api/messages/admin-chat?userId=${userId}&userType=${userType}`);
+      if (!effectiveUserId) return [];
+      const res = await fetch(`/api/messages/admin-chat?userId=${encodeURIComponent(effectiveUserId)}&userType=${userType}`);
       if (!res.ok) throw new Error('فشل جلب الرسائل');
       const data = await res.json();
       return data.messages || [];
     },
-    enabled: isOpen && !!userId,
+    enabled: isOpen && !!effectiveUserId,
     refetchInterval: 5000,
   });
 
@@ -50,23 +50,30 @@ export default function ChatOverlay({ isOpen, onClose, userType }: ChatOverlayPr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           content,
-          senderId: userId,
+          senderId: effectiveUserId,
           senderType: userType,
           receiverId: 'admin', // Default admin ID or indicator
           receiverType: 'admin',
           orderId: null,
         }),
       });
-      if (!res.ok) throw new Error('فشل إرسال الرسالة');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'فشل إرسال الرسالة');
+      }
       return res.json();
     },
     onSuccess: () => {
       setMessage('');
-      queryClient.invalidateQueries({ queryKey: ['/api/chat/admin', userId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/chat/admin', effectiveUserId, userType] });
       refetch();
     },
-    onError: () => {
-      toast({ title: 'فشل الإرسال', variant: 'destructive' });
+    onError: (err: any) => {
+      toast({ 
+        title: 'فشل الإرسال', 
+        description: err?.message || 'تعذر التواصل مع الإدارة حالياً',
+        variant: 'destructive' 
+      });
     },
   });
 
@@ -126,7 +133,7 @@ export default function ChatOverlay({ isOpen, onClose, userType }: ChatOverlayPr
             </div>
           ) : (
             messages.map((msg: any) => {
-              const isMe = msg.senderId === userId;
+              const isMe = msg.senderId === effectiveUserId || (msg.senderType === userType && msg.senderId !== 'admin');
               return (
                 <div 
                   key={msg.id} 
