@@ -273,7 +273,22 @@ export const notifications = pgTable("notifications", {
   message: text("message").notNull(),
   recipientType: varchar("recipient_type", { length: 50 }).notNull(),
   recipientId: text("recipient_id"), // تم التغيير من uuid إلى text لدعم الهوية بالهاتف للمستخدمين غير المسجلين
+  recipientName: text("recipient_name"),
+  allowReplies: boolean("allow_replies").default(true).notNull(),
   orderId: uuid("order_id"),
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Notification Replies table - ردود العملاء على الإشعارات
+export const notificationReplies = pgTable("notification_replies", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  notificationId: uuid("notification_id").notNull(),
+  senderType: varchar("sender_type", { length: 50 }).notNull(), // 'customer' | 'admin'
+  senderId: text("sender_id"),
+  senderName: varchar("sender_name", { length: 100 }),
+  senderPhone: varchar("sender_phone", { length: 50 }),
+  message: text("message").notNull(),
   isRead: boolean("is_read").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -776,10 +791,24 @@ export const insertNotificationSchema = createInsertSchema(notifications).partia
   id: true,
   createdAt: true,
   isRead: true,
+  allowReplies: true,
+  recipientName: true,
 });
 export const selectNotificationSchema = createSelectSchema(notifications);
 export type Notification = z.infer<typeof selectNotificationSchema>;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+export const insertNotificationReplySchema = createInsertSchema(notificationReplies).partial({
+  id: true,
+  createdAt: true,
+  isRead: true,
+  senderId: true,
+  senderName: true,
+  senderPhone: true,
+});
+export const selectNotificationReplySchema = createSelectSchema(notificationReplies);
+export type NotificationReply = z.infer<typeof selectNotificationReplySchema>;
+export type InsertNotificationReply = z.infer<typeof insertNotificationReplySchema>;
 
 export const insertWalletSchema = createInsertSchema(wallets).partial({
   id: true,

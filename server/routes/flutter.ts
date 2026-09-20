@@ -1,7 +1,7 @@
 import express from "express";
 import { storage } from "../storage.js";
 import { db } from "../db.js";
-import { deviceTokens, notifications } from "../../shared/schema.js";
+import { deviceTokens, notifications, notificationReplies } from "../../shared/schema.js";
 import { eq, and, gt, desc, or } from "drizzle-orm";
 
 const router = express.Router();
@@ -206,32 +206,40 @@ router.post("/notifications/send", async (req, res) => {
 });
 
 // POST /api/flutter/notifications/send-targeted
-// إرسال إشعار موجّه لفئة محددة
+// إرسال إشعار موجّه لفئة محددة أو مستخدم معين
 router.post("/notifications/send-targeted", async (req, res) => {
   try {
-    const { title, message, type = "info", recipientType = "all", recipientId = null } = req.body;
+    const { 
+      title, 
+      message, 
+      type = "info", 
+      recipientType = "all", 
+      recipientId = null,
+      recipientName = null,
+      allowReplies = true 
+    } = req.body;
 
     if (!title || !message) {
       return res.status(400).json({ success: false, message: "العنوان والمحتوى مطلوبان" });
     }
 
-    const db = getDb();
-
     const newNotification = await storage.createNotification({
-        type,
-        title,
-        message,
-        recipientType,
-        recipientId: recipientId || null,
-        isRead: false,
-      });
+      type,
+      title,
+      message,
+      recipientType,
+      recipientId: recipientId || null,
+      recipientName: recipientName || null,
+      allowReplies: allowReplies !== false,
+      isRead: false,
+    });
 
     const recipientLabel =
-      recipientType === 'all' ? 'جميع المستخدمين' :
-      recipientType === 'customer' ? 'العملاء' :
-      recipientType === 'driver' ? 'السائقين' :
+      recipientType === 'all' ? 'جميع المستخدمين (العملاء والسائقون وزوار التطبيق)' :
+      recipientType === 'customer' ? (recipientName ? `العميل (${recipientName})` : 'جميع العملاء') :
+      recipientType === 'driver' ? (recipientName ? `السائق (${recipientName})` : 'جميع السائقين') :
       recipientType === 'flutter' ? 'مستخدمي التطبيق' :
-      'مستخدم محدد';
+      'المستلم المحدد';
 
     res.json({
       success: true,
@@ -245,7 +253,7 @@ router.post("/notifications/send-targeted", async (req, res) => {
 });
 
 // GET /api/flutter/notifications/history
-// سجل جميع الإشعارات المرسلة
+// سجل جميع الإشعارات المرسلة مع عدد الردود
 router.get("/notifications/history", async (req, res) => {
   try {
     const db = getDb();
@@ -254,12 +262,10 @@ router.get("/notifications/history", async (req, res) => {
     const limitNum = parseInt(limitStr as string) || 50;
     const offsetNum = parseInt(offsetStr as string) || 0;
 
-    let query = db
+    const allNotifications = await db
       .select()
       .from(notifications)
       .orderBy(desc(notifications.createdAt));
-
-    const allNotifications = await query;
 
     let filtered = allNotifications;
     if (recipientType && recipientType !== 'all') {
@@ -269,7 +275,17 @@ router.get("/notifications/history", async (req, res) => {
       filtered = filtered.filter(n => n.type === notifType);
     }
 
-    const paginated = filtered.slice(offsetNum, offsetNum + limitNum);
+    // Get all replies for count aggregation
+    const allReplies = await storage.getAllNotificationReplies().catch(() => []);
+    const replyCountMap: Record<string, number> = {};
+    allReplies.forEach(r => {
+      replyCountMap[r.notificationId] = (replyCountMap[r.notificationId] || 0) + 1;
+    });
+
+    const paginated = filtered.slice(offsetNum, offsetNum + limitNum).map(n => ({
+      ...n,
+      replyCount: replyCountMap[n.id] || 0,
+    }));
     const unreadCount = filtered.filter(n => !n.isRead).length;
 
     res.json({
@@ -286,6 +302,152 @@ router.get("/notifications/history", async (req, res) => {
   }
 });
 
+// PUT /api/flutter/notifications/:id/allow-replies
+// تفعيل أو تعطيل ميزة الرد على إشعار محدد
+router.put("/notifications/:id/allow-replies", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { allowReplies } = req.body;
+
+    const updated = await storage.updateNotificationAllowReplies(id, !!allowReplies);
+    if (!updated) {
+      return res.status(404).json({ success: false, message: "الإشعار غير موجود" });
+    }
+
+    res.json({
+      success: true,
+      message: allowReplies ? "تم تفعيل الردود على هذا الإشعار" : "تم إلغاء ميزة الردود على هذا الإشعار",
+      notification: updated,
+    });
+  } catch (error) {
+    console.error("خطأ في تحديث حالة الردود:", error);
+    res.status(500).json({ success: false, message: "خطأ في الخادم" });
+  }
+});
+
+// GET /api/flutter/notifications/replies
+// جلب جميع ردود العملاء على الإشعارات
+router.get("/notifications/replies", async (req, res) => {
+  try {
+    const { notificationId } = req.query;
+    let replies: any[] = [];
+
+    if (notificationId) {
+      replies = await storage.getNotificationReplies(notificationId as string);
+    } else {
+      replies = await storage.getAllNotificationReplies();
+    }
+
+    // إرفاق معلومات الإشعار المرتبط بكل رد
+    const db = getDb();
+    const allNotifs = await db.select().from(notifications);
+    const notifMap = new Map(allNotifs.map(n => [n.id, n]));
+
+    const enriched = replies.map(r => ({
+      ...r,
+      notificationTitle: notifMap.get(r.notificationId)?.title || "إشعار عام",
+      notificationMessage: notifMap.get(r.notificationId)?.message || "",
+      notificationType: notifMap.get(r.notificationId)?.type || "info",
+    }));
+
+    res.json({
+      success: true,
+      replies: enriched,
+      count: enriched.length,
+      unreadCount: enriched.filter(r => !r.isRead).length,
+    });
+  } catch (error) {
+    console.error("خطأ في جلب ردود الإشعارات:", error);
+    res.status(500).json({ success: false, message: "خطأ في الخادم" });
+  }
+});
+
+// POST /api/flutter/notifications/:id/reply
+// إرسال رد على إشعار من قِبل العميل أو المشرف
+router.post("/notifications/:id/reply", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { message, senderType = 'customer', senderId, senderName, senderPhone } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, message: "نص الرد مطلوب" });
+    }
+
+    const db = getDb();
+    const [notif] = await db.select().from(notifications).where(eq(notifications.id, id));
+
+    if (!notif) {
+      return res.status(404).json({ success: false, message: "الإشعار غير موجود" });
+    }
+
+    if (notif.allowReplies === false) {
+      return res.status(403).json({ success: false, message: "ميزة الرد غير مفعلة لهذا الإشعار" });
+    }
+
+    const newReply = await storage.createNotificationReply({
+      notificationId: id,
+      senderType,
+      senderId: senderId || null,
+      senderName: senderName || 'عميل',
+      senderPhone: senderPhone || null,
+      message: message.trim(),
+      isRead: false,
+    });
+
+    res.json({
+      success: true,
+      message: "تم إرسال ردك بنجاح",
+      reply: newReply,
+    });
+  } catch (error) {
+    console.error("خطأ في إرسال الرد:", error);
+    res.status(500).json({ success: false, message: "خطأ في الخادم" });
+  }
+});
+
+// GET /api/flutter/notifications/:id/replies
+// جلب الردود الخاصة بإشعار محدد
+router.get("/notifications/:id/replies", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const replies = await storage.getNotificationReplies(id);
+    res.json({
+      success: true,
+      replies,
+      count: replies.length,
+    });
+  } catch (error) {
+    console.error("خطأ في جلب ردود الإشعار:", error);
+    res.status(500).json({ success: false, message: "خطأ في الخادم" });
+  }
+});
+
+// PUT /api/flutter/notifications/replies/:replyId/read
+// تعليم رد كمقروء
+router.put("/notifications/replies/:replyId/read", async (req, res) => {
+  try {
+    const { replyId } = req.params;
+    await storage.markNotificationReplyAsRead(replyId);
+    res.json({ success: true, message: "تم تحديث حالة الرد" });
+  } catch (error) {
+    console.error("خطأ في تعليم الرد كمقروء:", error);
+    res.status(500).json({ success: false, message: "خطأ في الخادم" });
+  }
+});
+
+// DELETE /api/flutter/notifications/replies/:replyId
+// حذف رد على إشعار
+router.delete("/notifications/replies/:replyId", async (req, res) => {
+  try {
+    const { replyId } = req.params;
+    await storage.deleteNotificationReply(replyId);
+    res.json({ success: true, message: "تم حذف الرد بنجاح" });
+  } catch (error) {
+    console.error("خطأ في حذف الرد:", error);
+    res.status(500).json({ success: false, message: "خطأ في الخادم" });
+  }
+});
+
 // DELETE /api/flutter/notifications/:id
 // حذف إشعار
 router.delete("/notifications/:id", async (req, res) => {
@@ -293,6 +455,8 @@ router.delete("/notifications/:id", async (req, res) => {
     const { id } = req.params;
     const db = getDb();
 
+    // حذف الردود المرتبطة أولاً
+    await db.delete(notificationReplies).where(eq(notificationReplies.notificationId, id)).catch(() => {});
     await db.delete(notifications).where(eq(notifications.id, id));
 
     res.json({ success: true, message: "تم حذف الإشعار بنجاح" });

@@ -52,9 +52,126 @@ router.post("/", async (req, res) => {
 });
 
 // ================================================================
-// مسارات تطبيق السائق المحمية (تتطلب توكن سائق)
-// ملاحظة مهمة: يجب تعريف المسارات المحددة قبل مسارات الـ wildcard
+// دالة فحص إمكانية استلام السائق لطلب إضافي (توزيع عادل ومنع تأخير التوصيل)
 // ================================================================
+export async function checkDriverMultiOrderAllowance(driverId: string) {
+  try {
+    const allOrders = await storage.getOrders();
+    let wasalniList: any[] = [];
+    try {
+      wasalniList = await storage.getWasalniRequests();
+    } catch (_) {}
+
+    const activeStatuses = ['assigned', 'pending', 'confirmed', 'accepted', 'preparing', 'ready', 'picked_up', 'on_way', 'on_the_way'];
+
+    // الطلبات النشطة للسائق الحالي
+    const driverActiveOrders = (allOrders || []).filter((o: any) =>
+      o.driverId === driverId && activeStatuses.includes(o.status)
+    );
+    const driverActiveWasalni = (wasalniList || []).filter((w: any) =>
+      w.driverId === driverId && activeStatuses.includes(w.status)
+    );
+    const currentActiveCount = driverActiveOrders.length + driverActiveWasalni.length;
+
+    // إذا لم يكن لديه أي طلب نشط، يُسمح له دائماً باستلام الطلب
+    if (currentActiveCount === 0) {
+      return {
+        allowed: true,
+        currentActiveCount: 0,
+        availableFreeDriversCount: 0,
+        totalOnlineDriversCount: 1,
+        allDriversBusy: false,
+        reason: "السائق متاح ولا يملك طلبات نشطة حالياً"
+      };
+    }
+
+    // السائق لديه طلب نشط أو أكثر: فحص حالة الموصلين الآخرين المتاحين
+    let allDrivers: any[] = [];
+    try {
+      allDrivers = await storage.getDrivers();
+    } catch (_) {}
+
+    // الموصلين الآخرين المفعلين والمتوفرين (isAvailable === true)
+    const otherOnlineDrivers = (allDrivers || []).filter((d: any) =>
+      d.id !== driverId && d.isActive !== false && d.isAvailable === true
+    );
+
+    // في حال كان هذا السائق هو السائق الوحيد المتاح على رأس العمل
+    if (otherOnlineDrivers.length === 0) {
+      return {
+        allowed: true,
+        currentActiveCount,
+        availableFreeDriversCount: 0,
+        totalOnlineDriversCount: 1,
+        allDriversBusy: true,
+        message: "أنت السائق المتاح الوحيد حالياً، مسموح لك باستلام طلبات متعددة لتلبية ضغط العمل."
+      };
+    }
+
+    // فحص ما إذا كان هناك موصلون متاحون بدون طلبات نشطة
+    let freeDriversCount = 0;
+    const freeDriverNames: string[] = [];
+
+    for (const other of otherOnlineDrivers) {
+      const otherActiveOrders = (allOrders || []).filter((o: any) =>
+        o.driverId === other.id && activeStatuses.includes(o.status)
+      );
+      const otherActiveWasalni = (wasalniList || []).filter((w: any) =>
+        w.driverId === other.id && activeStatuses.includes(w.status)
+      );
+      const otherTotal = otherActiveOrders.length + otherActiveWasalni.length;
+
+      if (otherTotal === 0) {
+        freeDriversCount++;
+        freeDriverNames.push(other.name || "سائق متاح");
+      }
+    }
+
+    // إذا كان هناك موصلون بدون طلبات: يُمنع الاستلام المتعدد
+    if (freeDriversCount > 0) {
+      return {
+        allowed: false,
+        currentActiveCount,
+        availableFreeDriversCount: freeDriversCount,
+        totalOnlineDriversCount: otherOnlineDrivers.length + 1,
+        allDriversBusy: false,
+        message: `لا يمكنك استلام أكثر من طلب حالياً؛ يوجد ${freeDriversCount === 1 ? 'كابتن آخر متاح وجاهز' : `${freeDriversCount} كباتن متاحين وجاهزين`} لاستلام الطلبات لتجنب تأخير التوصيل.`,
+        freeDriverNames
+      };
+    }
+
+    // إذا كان جميع الموصلين مستلمين لطلبات بالفعل: يُسمح باستلام طلب إضافي
+    return {
+      allowed: true,
+      currentActiveCount,
+      availableFreeDriversCount: 0,
+      totalOnlineDriversCount: otherOnlineDrivers.length + 1,
+      allDriversBusy: true,
+      message: "جميع الكباتن المتاحين لديهم طلبات جارية حالياً، تم فتح إمكانية استلام طلب إضافي لتغطية ضغط الطلبات."
+    };
+  } catch (err) {
+    console.error("خطأ أثناء فحص صلاحية الاستلام المتعدد:", err);
+    return {
+      allowed: true,
+      currentActiveCount: 0,
+      availableFreeDriversCount: 0,
+      totalOnlineDriversCount: 1,
+      allDriversBusy: true
+    };
+  }
+}
+
+// مسار فحص صلاحية الاستلام المتعدد للسائق
+router.get("/multi-order-eligibility", requireDriverAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const driverId = req.driverId!;
+    const status = await checkDriverMultiOrderAllowance(driverId);
+    res.json(status);
+  } catch (error) {
+    console.error("خطأ في فحص صلاحية الاستلام المتعدد:", error);
+    res.status(500).json({ error: "خطأ في الخادم" });
+  }
+});
 
 // لوحة معلومات السائق
 router.get("/app/dashboard", requireDriverAuth, async (req: AuthenticatedRequest, res) => {
@@ -179,6 +296,8 @@ router.get("/app/dashboard", requireDriverAuth, async (req: AuthenticatedRequest
       ...currentWasalni
     ];
 
+    const multiOrderEligibility = await checkDriverMultiOrderAllowance(driverId);
+
     res.json({
       stats: {
         todayOrders: todayOrders.length,
@@ -199,6 +318,7 @@ router.get("/app/dashboard", requireDriverAuth, async (req: AuthenticatedRequest
       },
       availableOrders,
       currentOrders,
+      multiOrderEligibility,
       reviews: driverReviews || [],
       balance: driverBalance || {
         availableBalance: "0",
@@ -457,6 +577,17 @@ router.post("/orders/:id/accept", requireDriverAuth, async (req: AuthenticatedRe
 
     if (['delivered', 'cancelled'].includes(order.status)) {
       return res.status(400).json({ error: "هذا الطلب ملغي أو مسبوق تسليمه" });
+    }
+
+    // فحص قاعدة استلام أكثر من طلب (توزيع عادل ومنع تأخير التوصيل):
+    // يسمح للسائق باستلام أكثر من طلب فقط إذا كان جميع الموصلين الآخرين المتاحين قد استلموا طلبات بالفعل
+    const multiOrderCheck = await checkDriverMultiOrderAllowance(driverId);
+    if (!multiOrderCheck.allowed) {
+      return res.status(403).json({
+        error: multiOrderCheck.message || "لا يمكنك استلام أكثر من طلب حالياً لوجود كباتن متاحين وجاهزين لاستلام الطلبات لتجنب تأخير التوصيل.",
+        cannotAcceptMultiple: true,
+        details: multiOrderCheck
+      });
     }
 
     const commissionRate = parseFloat(driver.commissionRate?.toString() || "70");
@@ -1374,6 +1505,17 @@ router.post("/wasalni/:id/accept", requireDriverAuth, async (req: AuthenticatedR
 
     if (['delivered', 'cancelled'].includes(request.status)) {
       return res.status(400).json({ error: "طلب وصل لي هذا ملغي أو مسبوق تسليمه" });
+    }
+
+    // فحص قاعدة استلام أكثر من طلب (توزيع عادل ومنع تأخير التوصيل):
+    // يسمح للسائق باستلام أكثر من طلب فقط إذا كان جميع الموصلين الآخرين المتاحين قد استلموا طلبات بالفعل
+    const multiOrderCheck = await checkDriverMultiOrderAllowance(driverId);
+    if (!multiOrderCheck.allowed) {
+      return res.status(403).json({
+        error: multiOrderCheck.message || "لا يمكنك استلام أكثر من طلب حالياً لوجود كباتن متاحين وجاهزين لاستلام الطلبات لتجنب تأخير التوصيل.",
+        cannotAcceptMultiple: true,
+        details: multiOrderCheck
+      });
     }
 
     let updated: any = null;

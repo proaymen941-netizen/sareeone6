@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import { 
   adminUsers, categories, restaurantSections, restaurants, 
   menuItems, users, customers, userAddresses, orders, specialOffers, 
-  notifications, ratings, systemSettingsTable as systemSettings, drivers, orderTracking,
+  notifications, notificationReplies, ratings, systemSettingsTable as systemSettings, drivers, orderTracking,
   cart, favorites, employees, attendance, leaveRequests, driverEarningsTable,
   driverBalances, driverTransactions, driverCommissions, driverWithdrawals,
   deliveryFeeSettings, deliveryZones, financialReports,
@@ -23,6 +23,7 @@ import {
   type Order, type InsertOrder,
   type SpecialOffer, type InsertSpecialOffer,
   type Notification, type InsertNotification,
+  type NotificationReply, type InsertNotificationReply,
   type Rating, type InsertRating,
   type SystemSettings, type InsertSystemSettings,
   type Driver, type InsertDriver,
@@ -1277,6 +1278,83 @@ async getNotifications(recipientType?: string, recipientId?: string, unread?: bo
     } catch (error) {
       console.error('Error marking notification as read:', error);
       return undefined;
+    }
+  }
+
+  async updateNotificationAllowReplies(id: string, allowReplies: boolean): Promise<Notification | undefined> {
+    try {
+      const [updated] = await this.db.update(notifications)
+        .set({ allowReplies })
+        .where(eq(notifications.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error('Error updating notification allowReplies:', error);
+      return undefined;
+    }
+  }
+
+  async createNotificationReply(reply: InsertNotificationReply): Promise<NotificationReply> {
+    try {
+      const [newReply] = await this.db.insert(notificationReplies).values(reply).returning();
+
+      // Notify via WebSocket
+      if (global.WS_MANAGER) {
+        global.WS_MANAGER.sendToAdmin('NEW_NOTIFICATION_REPLY', newReply);
+        global.WS_MANAGER.broadcast('NEW_NOTIFICATION_REPLY', newReply);
+      }
+
+      return newReply;
+    } catch (error) {
+      console.error('Error creating notification reply:', error);
+      throw error;
+    }
+  }
+
+  async getNotificationReplies(notificationId?: string): Promise<NotificationReply[]> {
+    try {
+      if (notificationId) {
+        return await this.db.select().from(notificationReplies)
+          .where(eq(notificationReplies.notificationId, notificationId))
+          .orderBy(asc(notificationReplies.createdAt));
+      }
+      return await this.db.select().from(notificationReplies)
+        .orderBy(asc(notificationReplies.createdAt));
+    } catch (error) {
+      console.error('Error fetching notification replies:', error);
+      return [];
+    }
+  }
+
+  async getAllNotificationReplies(): Promise<NotificationReply[]> {
+    try {
+      return await this.db.select().from(notificationReplies)
+        .orderBy(desc(notificationReplies.createdAt));
+    } catch (error) {
+      console.error('Error fetching all notification replies:', error);
+      return [];
+    }
+  }
+
+  async deleteNotificationReply(id: string): Promise<boolean> {
+    try {
+      await this.db.delete(notificationReplies).where(eq(notificationReplies.id, id));
+      return true;
+    } catch (error) {
+      console.error('Error deleting notification reply:', error);
+      return false;
+    }
+  }
+
+  async markNotificationReplyAsRead(id: string): Promise<boolean> {
+    try {
+      await this.db.update(notificationReplies)
+        .set({ isRead: true })
+        .where(eq(notificationReplies.id, id));
+      return true;
+    } catch (error) {
+      console.error('Error marking notification reply as read:', error);
+      return false;
     }
   }
 

@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { MapPin, Phone, DollarSign, Clock, CheckCircle, Bell, Bike, ArrowLeftRight, Navigation, Sparkles, Volume2, Truck } from 'lucide-react';
+import { MapPin, Phone, DollarSign, Clock, CheckCircle, CheckCircle2, Bell, Bike, ArrowLeftRight, Navigation, Sparkles, Volume2, Truck, AlertCircle, ShieldAlert, Users } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { soundAlert } from '@/lib/soundAlert';
 import { CallContactDialog } from '@/components/CallContactDialog';
@@ -111,6 +111,20 @@ export default function AvailableOrdersPage({ driverId, onSelectOrder, onOrderAc
     refetchIntervalInBackground: true,
     staleTime: 3000,
     placeholderData: (previousData) => previousData,
+    enabled: !!driverToken
+  });
+
+  // استعلام فحص إمكانية استلام أكثر من طلب (نظام التوزيع العادل)
+  const { data: multiOrderEligibility, refetch: refetchEligibility } = useQuery<any>({
+    queryKey: ['/api/drivers/multi-order-eligibility', driverId],
+    queryFn: async () => {
+      const response = await fetch('/api/drivers/multi-order-eligibility', {
+        headers: { 'Authorization': `Bearer ${driverToken}` }
+      });
+      if (!response.ok) return null;
+      return response.json();
+    },
+    refetchInterval: 5000,
     enabled: !!driverToken
   });
 
@@ -233,7 +247,7 @@ export default function AvailableOrdersPage({ driverId, onSelectOrder, onOrderAc
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refetchOrders(), refetchWasalni()]);
+    await Promise.all([refetchOrders(), refetchWasalni(), refetchEligibility()]);
     setRefreshing(false);
   };
 
@@ -253,7 +267,7 @@ export default function AvailableOrdersPage({ driverId, onSelectOrder, onOrderAc
   return (
     <div className="min-h-screen bg-gray-50 p-4" dir="rtl">
       <div className="max-w-2xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-4">
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold text-gray-900">الطلبات المتاحة</h1>
@@ -270,6 +284,40 @@ export default function AvailableOrdersPage({ driverId, onSelectOrder, onOrderAc
             {refreshing ? 'جاري التحديث...' : 'تحديث'}
           </Button>
         </div>
+
+        {/* تنبيه نظام توزيع الطلبات العادل وتعدد الطلبات */}
+        {multiOrderEligibility && multiOrderEligibility.currentActiveCount > 0 && (
+          <div className={`rounded-xl p-3.5 mb-5 border shadow-sm flex items-start gap-3 transition-all ${
+            multiOrderEligibility.allowed 
+              ? 'bg-emerald-50 border-emerald-300 text-emerald-950' 
+              : 'bg-amber-50 border-amber-300 text-amber-950'
+          }`}>
+            {multiOrderEligibility.allowed ? (
+              <Sparkles className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+            ) : (
+              <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            )}
+            <div className="flex-1 text-sm">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="font-bold flex items-center gap-1.5">
+                  {multiOrderEligibility.allowed ? '⚡ مسموح استلام طلبات إضافية' : '🔒 استلام أكثر من طلب مقيد حالياً'}
+                </span>
+                <Badge variant="outline" className={`text-xs ${
+                  multiOrderEligibility.allowed 
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
+                    : 'bg-amber-100 text-amber-800 border-amber-300'
+                }`}>
+                  {multiOrderEligibility.allowed ? 'ضغط طلبات' : 'توزيع عادل'}
+                </Badge>
+              </div>
+              <p className="text-xs opacity-90 leading-relaxed">
+                {multiOrderEligibility.message || (multiOrderEligibility.allowed 
+                  ? 'جميع الموصلين مشغولون بطلبات جارية، مسموح لك باستلام طلب إضافي لتغطية ضغط التوصيل.'
+                  : 'لديك طلب نشط بالفعل، ولا يمكن استلام أكثر من طلب لوجود كباتن آخرين متاحين لتفادي تأخير التوصيل.')}
+              </p>
+            </div>
+          </div>
+        )}
 
         {totalCount === 0 ? (
           <Card className="border-dashed border-2">

@@ -1501,18 +1501,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Customer notifications endpoint - by phone or customerId
+  // Customer notifications endpoint - by phone, customerId, or guest/all
   app.get("/api/notifications/customer", async (req, res) => {
     try {
       const { phone, customerId } = req.query;
-      if (!phone && !customerId) {
-        return res.status(400).json({ message: "phone or customerId required" });
-      }
-      // Get ALL customer notifications (both read and unread) - no unread filter
-      const allNotifs = await storage.getNotifications('customer');
-      const filtered = allNotifs.filter((n: any) => {
-        // إذا كان الإشعار موجه لجميع العملاء (recipientId هو null)
-        if (!n.recipientId || n.recipientId === 'all') return true;
+      
+      // Get all notifications across customer, all, and flutter types
+      const allCustomerNotifs = await storage.getNotifications('customer');
+      const allBroadcastNotifs = await storage.getNotifications('all');
+      const allFlutterNotifs = await storage.getNotifications('flutter');
+
+      const combined = [
+        ...allCustomerNotifs,
+        ...allBroadcastNotifs,
+        ...allFlutterNotifs
+      ];
+
+      // Remove duplicates by id
+      const uniqueMap = new Map();
+      combined.forEach((n: any) => {
+        if (!uniqueMap.has(n.id)) uniqueMap.set(n.id, n);
+      });
+      const uniqueNotifs = Array.from(uniqueMap.values());
+
+      const filtered = uniqueNotifs.filter((n: any) => {
+        // إذا كان الإشعار عام لجميع المستخدمين أو أجهزة التطبيق
+        if (n.recipientType === 'all' || n.recipientType === 'flutter') return true;
+
+        // إذا كان الإشعار موجه لجميع العملاء (recipientId هو null أو all)
+        if (n.recipientType === 'customer' && (!n.recipientId || n.recipientId === 'all')) return true;
         
         // إذا كان الإشعار موجه لعميل محدد
         if (customerId && n.recipientId === customerId) return true;
@@ -1520,11 +1537,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         return false;
       });
-      filtered.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      res.json(filtered);
+
+      // جلب ردود الإشعارات لإرفاقها مع كل إشعار
+      const allReplies = await storage.getAllNotificationReplies().catch(() => []);
+      const repliesByNotif = new Map<string, any[]>();
+      allReplies.forEach((r: any) => {
+        const list = repliesByNotif.get(r.notificationId) || [];
+        list.push(r);
+        repliesByNotif.set(r.notificationId, list);
+      });
+
+      const enriched = filtered.map((n: any) => ({
+        ...n,
+        allowReplies: n.allowReplies !== false,
+        replies: repliesByNotif.get(n.id) || [],
+        replyCount: (repliesByNotif.get(n.id) || []).length,
+      }));
+
+      enriched.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      res.json(enriched);
     } catch (error) {
       console.error('Error fetching customer notifications:', error);
       res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  // Customer replies to a notification
+  app.post("/api/notifications/:id/reply", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { message, senderType = 'customer', senderId, senderName, senderPhone } = req.body;
+
+      if (!message || !message.trim()) {
+        return res.status(400).json({ message: "Message is required" });
+      }
+
+      const allNotifs = await storage.getNotifications();
+      const notif = allNotifs.find(n => n.id === id);
+
+      if (!notif) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+
+      if (notif.allowReplies === false) {
+        return res.status(403).json({ message: "Replies are disabled for this notification" });
+      }
+
+      const newReply = await storage.createNotificationReply({
+        notificationId: id,
+        senderType,
+        senderId: senderId || null,
+        senderName: senderName || 'عميل',
+        senderPhone: senderPhone || null,
+        message: message.trim(),
+        isRead: false,
+      });
+
+      res.json({ success: true, reply: newReply });
+    } catch (error) {
+      console.error("Error creating notification reply:", error);
+      res.status(500).json({ message: "Failed to post reply" });
+    }
+  });
+
+  // Get replies for a specific notification
+  app.get("/api/notifications/:id/replies", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const replies = await storage.getNotificationReplies(id);
+      res.json(replies);
+    } catch (error) {
+      console.error("Error fetching replies:", error);
+      res.status(500).json({ message: "Failed to fetch replies" });
     }
   });
 

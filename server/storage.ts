@@ -14,6 +14,7 @@ import {
   type Favorites, type InsertFavorites,
   type AdminUser, type InsertAdminUser,
   type Notification, type InsertNotification,
+  type NotificationReply, type InsertNotificationReply,
   // إضافة الأنواع الجديدة
   type DriverBalance, type InsertDriverBalance,
   type DriverTransaction, type InsertDriverTransaction,
@@ -170,6 +171,12 @@ export interface IStorage {
   // Enhanced notification methods
   getNotifications(recipientType?: string, recipientId?: string, unread?: boolean): Promise<Notification[]>;
   markNotificationAsRead(id: string): Promise<Notification | undefined>;
+  updateNotificationAllowReplies(id: string, allowReplies: boolean): Promise<Notification | undefined>;
+  createNotificationReply(reply: InsertNotificationReply): Promise<NotificationReply>;
+  getNotificationReplies(notificationId?: string): Promise<NotificationReply[]>;
+  getAllNotificationReplies(): Promise<NotificationReply[]>;
+  deleteNotificationReply(id: string): Promise<boolean>;
+  markNotificationReplyAsRead(id: string): Promise<boolean>;
 
   // Search methods
   searchRestaurants(query: string, category?: string): Promise<Restaurant[]>;
@@ -345,6 +352,7 @@ export class MemStorage {
   private paymentMethodsMap: Map<string, any>;
   private paymentGatewaysMap: Map<string, any>;
   private paymentMethodDocumentsMap: Map<string, any>;
+  private notificationRepliesMap: Map<string, NotificationReply>;
 
   // Add db property for compatibility with routes that access it directly
   get db() {
@@ -392,6 +400,7 @@ export class MemStorage {
     this.paymentMethodDocumentsMap = new Map();
     this.customerWalletsMap = new Map();
     this.customerWalletTransactionsMap = new Map();
+    this.notificationRepliesMap = new Map();
     
     this.initializeData();
   }
@@ -1981,6 +1990,8 @@ export class MemStorage {
       ...notification,
       id,
       recipientId: notification.recipientId ?? null,
+      recipientName: notification.recipientName ?? null,
+      allowReplies: notification.allowReplies ?? true,
       orderId: notification.orderId ?? null,
       isRead: notification.isRead ?? false,
       createdAt: new Date()
@@ -2012,6 +2023,62 @@ export class MemStorage {
     const updated = { ...notification, isRead: true };
     this.notifications.set(id, updated);
     return updated;
+  }
+
+  async updateNotificationAllowReplies(id: string, allowReplies: boolean): Promise<Notification | undefined> {
+    const notification = this.notifications.get(id);
+    if (!notification) return undefined;
+    const updated = { ...notification, allowReplies };
+    this.notifications.set(id, updated);
+    return updated;
+  }
+
+  async createNotificationReply(reply: InsertNotificationReply): Promise<NotificationReply> {
+    const id = randomUUID();
+    const newReply: NotificationReply = {
+      id,
+      notificationId: reply.notificationId,
+      senderType: reply.senderType,
+      senderId: reply.senderId ?? null,
+      senderName: reply.senderName ?? null,
+      senderPhone: reply.senderPhone ?? null,
+      message: reply.message,
+      isRead: reply.isRead ?? false,
+      createdAt: new Date(),
+    };
+    this.notificationRepliesMap.set(id, newReply);
+
+    const wsManager = (global as any).WS_MANAGER;
+    if (wsManager) {
+      wsManager.sendToAdmin('NEW_NOTIFICATION_REPLY', newReply);
+      wsManager.broadcast('NEW_NOTIFICATION_REPLY', newReply);
+    }
+    return newReply;
+  }
+
+  async getNotificationReplies(notificationId?: string): Promise<NotificationReply[]> {
+    let replies = Array.from(this.notificationRepliesMap.values());
+    if (notificationId) {
+      replies = replies.filter(r => r.notificationId === notificationId);
+    }
+    return replies.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }
+
+  async getAllNotificationReplies(): Promise<NotificationReply[]> {
+    return Array.from(this.notificationRepliesMap.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }
+
+  async deleteNotificationReply(id: string): Promise<boolean> {
+    return this.notificationRepliesMap.delete(id);
+  }
+
+  async markNotificationReplyAsRead(id: string): Promise<boolean> {
+    const reply = this.notificationRepliesMap.get(id);
+    if (!reply) return false;
+    this.notificationRepliesMap.set(id, { ...reply, isRead: true });
+    return true;
   }
 
   // Search methods

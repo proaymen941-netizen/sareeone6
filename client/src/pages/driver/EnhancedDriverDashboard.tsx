@@ -41,7 +41,9 @@ import {
   RefreshCw,
   Volume2,
   VolumeX,
-  Zap
+  Zap,
+  ShieldAlert,
+  Sparkles
 } from 'lucide-react';
 
 interface Order {
@@ -282,7 +284,8 @@ export default function EnhancedDriverDashboard({ driverId, onLogout }: Enhanced
     availableOrders = [], 
     currentOrders = [], 
     stats = {} as DashboardStats,
-    driver = {} as any
+    driver = {} as any,
+    multiOrderEligibility = null
   } = dashboardData || {};
 
   // فلترة الطلبات المتاحة بدقة لاستبعاد أي طلب تم قبوله أو تعيينه لهذا السائق أو لسائق آخر
@@ -744,6 +747,40 @@ export default function EnhancedDriverDashboard({ driverId, onLogout }: Enhanced
                       عرض الكل ({unassignedAvailableOrders.length})
                     </Button>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Multi-Order Eligibility Alert Banner */}
+            {currentOrders.length > 0 && multiOrderEligibility && (
+              <div className={`rounded-2xl p-4 border shadow-md flex items-start gap-3 transition-all ${
+                multiOrderEligibility.allowed 
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-950' 
+                  : 'bg-amber-50 border-amber-300 text-amber-950'
+              }`}>
+                {multiOrderEligibility.allowed ? (
+                  <Sparkles className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5 animate-pulse" />
+                ) : (
+                  <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                )}
+                <div className="flex-1 text-sm">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="font-bold flex items-center gap-1.5">
+                      {multiOrderEligibility.allowed ? '⚡ مسموح استلام طلبات إضافية' : '🔒 استلام أكثر من طلب مقيد حالياً'}
+                    </span>
+                    <Badge variant="outline" className={`text-xs ${
+                      multiOrderEligibility.allowed 
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
+                        : 'bg-amber-100 text-amber-800 border-amber-300'
+                    }`}>
+                      {multiOrderEligibility.allowed ? 'ضغط طلبات' : 'توزيع عادل'}
+                    </Badge>
+                  </div>
+                  <p className="text-xs opacity-90 leading-relaxed">
+                    {multiOrderEligibility.message || (multiOrderEligibility.allowed 
+                      ? 'جميع الكباتن مشغولون بطلبات جارية، مسموح لك باستلام طلب إضافي لتغطية ضغط التوصيل.'
+                      : 'لديك طلب نشط بالفعل، ولا يمكن استلام أكثر من طلب لوجود كباتن آخرين متاحين لتفادي تأخير التوصيل.')}
+                  </p>
                 </div>
               </div>
             )}

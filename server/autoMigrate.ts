@@ -298,7 +298,21 @@ export async function ensureTablesExist() {
         message TEXT NOT NULL,
         recipient_type VARCHAR(50) NOT NULL,
         recipient_id TEXT,
+        recipient_name TEXT,
+        allow_replies BOOLEAN DEFAULT true NOT NULL,
         order_id UUID,
+        is_read BOOLEAN DEFAULT false NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS notification_replies (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        notification_id UUID NOT NULL,
+        sender_type VARCHAR(50) NOT NULL,
+        sender_id TEXT,
+        sender_name VARCHAR(100),
+        sender_phone VARCHAR(50),
+        message TEXT NOT NULL,
         is_read BOOLEAN DEFAULT false NOT NULL,
         created_at TIMESTAMP DEFAULT NOW() NOT NULL
       );
@@ -913,6 +927,21 @@ export async function ensureTablesExist() {
         ALTER TABLE coupons ADD COLUMN IF NOT EXISTS end_date TIMESTAMP;
         ALTER TABLE coupons ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
         ALTER TABLE coupons ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
+
+        ALTER TABLE notifications ADD COLUMN IF NOT EXISTS allow_replies BOOLEAN DEFAULT true;
+        ALTER TABLE notifications ADD COLUMN IF NOT EXISTS recipient_name TEXT;
+
+        CREATE TABLE IF NOT EXISTS notification_replies (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          notification_id UUID NOT NULL,
+          sender_type VARCHAR(50) NOT NULL,
+          sender_id TEXT,
+          sender_name VARCHAR(100),
+          sender_phone VARCHAR(50),
+          message TEXT NOT NULL,
+          is_read BOOLEAN DEFAULT false NOT NULL,
+          created_at TIMESTAMP DEFAULT NOW() NOT NULL
+        );
       `);
     } catch (columnErr: any) {
       console.warn("⚠️ Warning ensuring additional columns:", columnErr?.message || columnErr);
@@ -926,6 +955,11 @@ export async function ensureTablesExist() {
         CREATE INDEX IF NOT EXISTS idx_orders_restaurant_id ON orders(restaurant_id);
         CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
         CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications(recipient_type, recipient_id);
+        CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+        CREATE INDEX IF NOT EXISTS idx_notification_replies_notif_id ON notification_replies(notification_id);
+        CREATE INDEX IF NOT EXISTS idx_notification_replies_created ON notification_replies(created_at DESC);
 
         CREATE INDEX IF NOT EXISTS idx_menu_items_restaurant_id ON menu_items(restaurant_id);
         CREATE INDEX IF NOT EXISTS idx_menu_items_category ON menu_items(category);
