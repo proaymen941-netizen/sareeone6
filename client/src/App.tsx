@@ -43,7 +43,9 @@ function MainApp() {
   const { getSetting } = useUiSettings();
   const { location: userLocation } = useUserLocation();
   const [currentLocation, setLocation] = useWouterLocation();
-  const [showLocationModal, setShowLocationModal] = useState(true);
+  const [showLocationModal, setShowLocationModal] = useState(() => {
+    return localStorage.getItem('location_permission_granted') !== 'true';
+  });
   const [showSplash, setShowSplash] = useState(() => {
     return !sessionStorage.getItem('splash_seen');
   });
@@ -53,20 +55,18 @@ function MainApp() {
   });
 
   const isCitySelectionEnabled = getSetting('enable_city_selection') === 'true';
-  const forceCitySelection = getSetting('force_city_selection_on_launch') === 'true';
 
-  // Trigger city selection modal right after splash if enabled and appropriate
+  // Trigger city selection modal ONLY on the first time if user has never selected a city
   useEffect(() => {
     if (!showSplash && isCitySelectionEnabled) {
       const selectedCity = localStorage.getItem('selected_city_name');
-      const hasChosenThisSession = sessionStorage.getItem('city_selection_prompted');
+      const hasChosenEver = localStorage.getItem('city_chosen_first_time') === 'true';
       
-      if (!selectedCity || (forceCitySelection && !hasChosenThisSession)) {
-        sessionStorage.setItem('city_selection_prompted', 'true');
+      if (!selectedCity && !hasChosenEver) {
         setShowCityModal(true);
       }
     }
-  }, [showSplash, isCitySelectionEnabled, forceCitySelection]);
+  }, [showSplash, isCitySelectionEnabled]);
 
   useEffect(() => {
     const handleStorageChange = () => {
@@ -174,14 +174,14 @@ function MainApp() {
       </Layout>
       <FloatingCartNotification />
       
-      {showLocationModal && !userLocation.hasPermission && (
+      {showLocationModal && !userLocation.hasPermission && localStorage.getItem('location_permission_granted') !== 'true' && (
         <LocationPermissionModal
           onPermissionGranted={(position) => {
-            console.log('تم منح الإذن للموقع:', position);
+            localStorage.setItem('location_permission_granted', 'true');
             setShowLocationModal(false);
           }}
           onPermissionDenied={() => {
-            console.log('تم رفض الإذن للموقع');
+            sessionStorage.setItem('location_modal_dismissed', 'true');
             setShowLocationModal(false);
           }}
         />

@@ -124,6 +124,7 @@ export const CitySelectionModal: React.FC<CitySelectionModalProps> = ({
     setSelectedCityId(city.id);
     localStorage.setItem('selected_city_id', city.id);
     localStorage.setItem('selected_city_name', city.name);
+    localStorage.setItem('city_chosen_first_time', 'true');
     if (city.serverUrl) {
       localStorage.setItem('selected_city_url', city.serverUrl);
     } else {
