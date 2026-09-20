@@ -5,7 +5,8 @@ import {
   History, Filter, RefreshCw, Globe, Truck, User, Info,
   Tag, AlertTriangle, ShoppingBag, CreditCard, BarChart2,
   Clock, Target, Gift, MessageSquare, Phone, Search,
-  MessageCircle, Reply, ToggleLeft, ToggleRight, CheckCheck, Eye
+  MessageCircle, Reply, ToggleLeft, ToggleRight, CheckCheck, Eye,
+  Bot, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -94,7 +95,7 @@ export default function AdminNotifications() {
 
   // Form State
   const [form, setForm] = useState({
-    title: '',
+    title: 'إدارة السريع ون',
     message: '',
     type: 'info',
     recipientType: 'all', // 'all' | 'customer' | 'driver' | 'flutter'
@@ -314,6 +315,93 @@ export default function AdminNotifications() {
   });
 
   // Mark reply as read mutation
+  // Reply to Customer Reply State
+  const [replyingTo, setReplyingTo] = useState<any>(null);
+  const [replyMessage, setReplyMessage] = useState('');
+
+  // Direct Chat State
+  const [selectedChatUser, setSelectedChatUser] = useState<any>(null);
+  const [adminChatMessage, setAdminChatMessage] = useState('');
+
+  const { data: conversationsData, refetch: refetchConversations } = useQuery({
+    queryKey: ['/api/messages/admin/conversations'],
+    queryFn: async () => {
+      const res = await fetch('/api/messages/admin/conversations');
+      if (!res.ok) return { conversations: [] };
+      return res.json();
+    },
+    refetchInterval: 10000,
+  });
+
+  const { data: chatMessages = [], refetch: refetchChatMessages } = useQuery({
+    queryKey: ['/api/messages/admin-chat', selectedChatUser?.userId],
+    queryFn: async () => {
+      if (!selectedChatUser) return [];
+      const res = await fetch(`/api/messages/admin-chat?userId=${selectedChatUser.userId}&userType=${selectedChatUser.userType}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.messages || [];
+    },
+    enabled: !!selectedChatUser,
+    refetchInterval: 5000,
+  });
+
+  const sendAdminMessageMutation = useMutation({
+    mutationFn: async (content: string) => {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content,
+          senderId: 'admin',
+          senderType: 'admin',
+          receiverId: selectedChatUser.userId,
+          receiverType: selectedChatUser.userType,
+          orderId: null,
+        }),
+      });
+      if (!res.ok) throw new Error('فشل الإرسال');
+      return res.json();
+    },
+    onSuccess: () => {
+      setAdminChatMessage('');
+      refetchChatMessages();
+    },
+  });
+
+  const sendReplyToCustomerMutation = useMutation({
+    mutationFn: async (data: { notificationId: string; message: string }) => {
+      const response = await fetch(`/api/flutter/notifications/${data.notificationId}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: data.message,
+          senderType: 'admin',
+          senderName: 'إدارة السريع ون',
+        }),
+      });
+      if (!response.ok) throw new Error('فشل إرسال الرد');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'تم إرسال الرد بنجاح', className: 'bg-green-600 text-white' });
+      setReplyingTo(null);
+      setReplyMessage('');
+      refetchReplies();
+    },
+    onError: () => {
+      toast({ title: 'فشل إرسال الرد', variant: 'destructive' });
+    },
+  });
+
+  const handleSendAdminReply = () => {
+    if (!replyMessage.trim() || !replyingTo) return;
+    sendReplyToCustomerMutation.mutate({
+      notificationId: replyingTo.notificationId,
+      message: replyMessage,
+    });
+  };
+
   const markReplyReadMutation = useMutation({
     mutationFn: async (replyId: string) => {
       const res = await fetch(`/api/flutter/notifications/replies/${replyId}/read`, { method: 'PUT' });
@@ -472,7 +560,7 @@ export default function AdminNotifications() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 p-1 bg-gray-100 rounded-xl">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 p-1 bg-gray-100 rounded-xl">
           <TabsTrigger value="send" className="gap-2 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <Send className="h-4 w-4 text-green-600" />
             إرسال إشعار
@@ -485,6 +573,10 @@ export default function AdminNotifications() {
                 {unreadRepliesCount}
               </span>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="direct" className="gap-2 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <Bot className="h-4 w-4 text-blue-600" />
+            المراسلات المباشرة
           </TabsTrigger>
           <TabsTrigger value="history" className="gap-2 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <History className="h-4 w-4 text-blue-600" />
@@ -829,6 +921,117 @@ export default function AdminNotifications() {
           </Card>
         </TabsContent>
 
+        {/* ── تبويب المراسلات المباشرة ── */}
+        <TabsContent value="direct" className="space-y-4">
+          <Card className="border-2 border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex h-[600px] flex-col md:flex-row">
+              {/* قائمة المحادثات */}
+              <div className="w-full md:w-80 border-l bg-gray-50 flex flex-col">
+                <div className="p-4 border-b bg-white">
+                  <h3 className="font-black text-gray-800 flex items-center gap-2">
+                    <MessageCircle className="h-5 w-5 text-primary" />
+                    المحادثات المباشرة
+                  </h3>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {(conversationsData?.conversations || []).length === 0 ? (
+                    <div className="p-8 text-center opacity-40">
+                      <p className="text-sm font-bold">لا توجد محادثات نشطة</p>
+                    </div>
+                  ) : (
+                    (conversationsData?.conversations || []).map((conv: any) => (
+                      <button
+                        key={`${conv.userType}:${conv.userId}`}
+                        onClick={() => setSelectedChatUser(conv)}
+                        className={`w-full p-4 flex items-center gap-3 border-b transition-colors hover:bg-white ${
+                          selectedChatUser?.userId === conv.userId ? 'bg-white border-r-4 border-primary shadow-sm' : ''
+                        }`}
+                      >
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                          conv.userType === 'driver' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'
+                        }`}>
+                          {conv.userType === 'driver' ? <Truck className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                        </div>
+                        <div className="flex-1 text-right min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-sm truncate">{conv.userType === 'driver' ? 'سائق' : 'عميل'}: {conv.userId.slice(-6)}</span>
+                            <span className="text-[9px] text-gray-400 shrink-0">{new Date(conv.lastMessageAt).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          <p className="text-xs text-gray-500 truncate mt-0.5">{conv.lastMessage}</p>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* نافذة الشات */}
+              <div className="flex-1 flex flex-col bg-white">
+                {selectedChatUser ? (
+                  <>
+                    <div className="p-4 border-b flex items-center justify-between bg-gray-50/50">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          selectedChatUser.userType === 'driver' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'
+                        }`}>
+                          {selectedChatUser.userType === 'driver' ? <Truck className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                        </div>
+                        <div className="text-right">
+                          <h4 className="font-black text-sm">{selectedChatUser.userType === 'driver' ? 'سائق' : 'عميل'} (ID: {selectedChatUser.userId.slice(-6)})</h4>
+                          <span className="text-[10px] text-green-600 font-bold">متصل الآن</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/30">
+                      {chatMessages.map((msg: any) => {
+                        const isMe = msg.senderType === 'admin';
+                        return (
+                          <div key={msg.id} className={`flex ${isMe ? 'justify-start' : 'justify-end'}`}>
+                            <div className={`max-w-[70%] p-3 rounded-2xl shadow-sm text-sm ${
+                              isMe ? 'bg-primary text-white rounded-tr-none' : 'bg-white border border-gray-100 rounded-tl-none'
+                            }`}>
+                              <p className="leading-relaxed">{msg.content}</p>
+                              <span className={`text-[9px] block mt-1 ${isMe ? 'text-white/60 text-left' : 'text-gray-400 text-right'}`}>
+                                {new Date(msg.createdAt).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="p-4 border-t bg-gray-50/50">
+                      <div className="flex gap-2">
+                        <Textarea 
+                          placeholder="اكتب ردك هنا..."
+                          value={adminChatMessage}
+                          onChange={(e) => setAdminChatMessage(e.target.value)}
+                          className="min-h-[60px] resize-none rounded-xl border-gray-200 focus:border-primary"
+                        />
+                        <Button 
+                          onClick={() => adminChatMessage.trim() && sendAdminMessageMutation.mutate(adminChatMessage)}
+                          disabled={!adminChatMessage.trim() || sendAdminMessageMutation.isPending}
+                          className="h-auto px-6 bg-primary hover:bg-primary/90 rounded-xl font-bold gap-2"
+                        >
+                          {sendAdminMessageMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                          إرسال
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center opacity-30 p-8 text-center">
+                    <MessageCircle className="h-16 w-16 mb-4 text-primary" />
+                    <h3 className="text-xl font-black">اختر محادثة للبدء</h3>
+                    <p className="text-sm font-bold mt-2">تواصل مباشرة مع العملاء والسائقين من هنا</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
+        </TabsContent>
+
         {/* ── تبويب ردود العملاء ── */}
         <TabsContent value="replies" className="space-y-4">
           <Card>
@@ -905,6 +1108,15 @@ export default function AdminNotifications() {
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setReplyingTo(reply)}
+                            className="text-xs h-8 gap-1 border-blue-300 text-blue-700 hover:bg-blue-50"
+                          >
+                            <MessageCircle className="h-3.5 w-3.5" />
+                            الرد على العميل
+                          </Button>
                           {!reply.isRead && (
                             <Button 
                               size="sm" 
@@ -933,6 +1145,45 @@ export default function AdminNotifications() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── حوار الرد على العميل ── */}
+        <Dialog open={!!replyingTo} onOpenChange={(open) => !open && setReplyingTo(null)}>
+          <DialogContent className="sm:max-w-[500px]" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <MessageCircle className="h-5 w-5 text-primary" />
+                الرد على العميل: {replyingTo?.senderName}
+              </DialogTitle>
+              <DialogDescription>
+                سيتم إرسال ردك كإشعار تفاعلي للعميل على تطبيقه
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="p-3 bg-gray-50 rounded-xl border text-sm text-gray-600 italic">
+                "{replyingTo?.message}"
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700">نص الرد الإداري:</label>
+                <Textarea
+                  placeholder="اكتب ردك هنا..."
+                  value={replyMessage}
+                  onChange={(e) => setReplyMessage(e.target.value)}
+                  className="min-h-[120px] rounded-xl border-gray-300 focus:border-primary"
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setReplyingTo(null)} className="rounded-xl">إلغاء</Button>
+              <Button 
+                onClick={handleSendAdminReply} 
+                disabled={!replyMessage.trim() || sendReplyToCustomerMutation.isPending}
+                className="rounded-xl bg-primary hover:bg-primary/90"
+              >
+                {sendReplyToCustomerMutation.isPending ? 'جاري الإرسال...' : 'إرسال الرد الآن'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* ── تبويب سجل الإشعارات ── */}
         <TabsContent value="history" className="space-y-4">

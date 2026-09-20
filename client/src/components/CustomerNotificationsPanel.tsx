@@ -123,6 +123,7 @@ export function CustomerNotificationsPanel() {
     sendReplyMutation.mutate({ notifId, message: text });
   };
 
+  // unreadCount calculations and other logic remains
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   // WebSocket listener for real-time notification refresh
@@ -278,10 +279,6 @@ export function CustomerNotificationsPanel() {
                 </div>
               ) : (
                 notifications.map((notif) => {
-                  const allowReplies = notif.allowReplies !== false;
-                  const isReplyExpanded = expandedReplyId === notif.id;
-                  const replies = notif.replies || [];
-
                   return (
                     <div
                       key={notif.id}
@@ -333,71 +330,9 @@ export function CustomerNotificationsPanel() {
                           <p className="text-xs text-gray-600 mt-1 leading-relaxed whitespace-pre-wrap">{notif.message}</p>
                           <div className="flex items-center justify-between mt-2">
                             <p className="text-[10px] text-gray-400">{timeAgo(notif.createdAt)}</p>
-
-                            {/* زر فتح الرد إذا كانت الميزة مفعلة */}
-                            {allowReplies && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setExpandedReplyId(isReplyExpanded ? null : notif.id);
-                                }}
-                                className="flex items-center gap-1 text-xs font-bold text-primary hover:text-primary/80 bg-primary/10 px-2 py-0.5 rounded-lg"
-                              >
-                                <MessageCircle className="h-3 w-3" />
-                                <span>{replies.length > 0 ? `الردود (${replies.length})` : 'الرد على الإشعار'}</span>
-                                {isReplyExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                              </button>
-                            )}
                           </div>
                         </div>
                       </div>
-
-                      {/* قسم الردود التفاعلية للعميل */}
-                      {allowReplies && isReplyExpanded && (
-                        <div className="bg-gray-50/90 px-4 py-3 border-t border-dashed border-gray-200 space-y-3">
-                          {/* عرض الردود السابقة */}
-                          {replies.length > 0 && (
-                            <div className="space-y-2 max-h-40 overflow-y-auto">
-                              <p className="text-[11px] font-bold text-gray-500">الردود السابقة:</p>
-                              {replies.map((rep) => (
-                                <div key={rep.id} className="bg-white p-2.5 rounded-xl border border-gray-200 text-xs shadow-xs">
-                                  <div className="flex items-center justify-between text-[10px] text-gray-400 mb-1">
-                                    <span className="font-bold text-primary">{rep.senderName || 'أنت'}</span>
-                                    <span>{new Date(rep.createdAt).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' })}</span>
-                                  </div>
-                                  <p className="text-gray-800 leading-snug">{rep.message}</p>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* حقل إدخال الرد الجديد */}
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              placeholder="اكتب ردك أو استفسارك هنا..."
-                              value={replyTextMap[notif.id] || ''}
-                              onChange={(e) => setReplyTextMap(prev => ({ ...prev, [notif.id]: e.target.value }))}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  handleSendReply(notif.id, e as any);
-                                }
-                              }}
-                              className="flex-1 text-xs bg-white border border-gray-300 rounded-xl px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary text-gray-800"
-                            />
-                            <button
-                              type="button"
-                              onClick={(e) => handleSendReply(notif.id, e)}
-                              disabled={sendReplyMutation.isPending || !replyTextMap[notif.id]?.trim()}
-                              className="bg-primary hover:bg-primary/90 disabled:opacity-50 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 shrink-0 transition-opacity shadow-xs"
-                            >
-                              <Send className="h-3 w-3" />
-                              <span>إرسال</span>
-                            </button>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   );
                 })

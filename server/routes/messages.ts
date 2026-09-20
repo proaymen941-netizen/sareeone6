@@ -20,24 +20,45 @@ router.get("/order/:orderId", async (req, res) => {
 // Get conversation between two users
 router.get("/conversation", async (req, res) => {
   try {
-    const { userId1, userId2, type1, type2 } = req.query;
+    const { userId1, userId2 } = req.query;
     
     if (!userId1 || !userId2) {
       return res.status(400).json({ message: "Missing user IDs" });
     }
 
-    // Get all messages and filter
-    // This is a simplified implementation - in production you'd have a proper conversation query
-    const messages = await storage.getMessages("");
-    const filtered = messages.filter((m: any) => 
-      (m.senderId === userId1 && m.receiverId === userId2) ||
-      (m.senderId === userId2 && m.receiverId === userId1)
-    );
-    
-    res.json(filtered);
+    const messages = await storage.getAdminChatMessages(userId1 as string, 'customer'); // Simplified
+    res.json(messages);
   } catch (error) {
     console.error("Error fetching conversation:", error);
     res.status(500).json({ message: "Failed to fetch conversation" });
+  }
+});
+
+// Get admin chat messages
+router.get("/admin-chat", async (req, res) => {
+  try {
+    const { userId, userType } = req.query;
+    
+    if (!userId || !userType) {
+      return res.status(400).json({ message: "Missing user ID or type" });
+    }
+
+    const messages = await storage.getAdminChatMessages(userId as string, userType as string);
+    res.json({ success: true, messages });
+  } catch (error) {
+    console.error("Error fetching admin chat:", error);
+    res.status(500).json({ message: "Failed to fetch admin chat" });
+  }
+});
+
+// Get admin conversations
+router.get("/admin/conversations", async (req, res) => {
+  try {
+    const conversations = await storage.getAdminConversations();
+    res.json({ success: true, conversations });
+  } catch (error) {
+    console.error("Error fetching admin conversations:", error);
+    res.status(500).json({ message: "Failed to fetch admin conversations" });
   }
 });
 

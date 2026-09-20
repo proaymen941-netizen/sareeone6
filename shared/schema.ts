@@ -125,7 +125,9 @@ export const drivers = pgTable("drivers", {
   allowProfileEdit: boolean("allow_profile_edit").default(true), // السماح للسائق بتعديل ملفه الشخصي
   canViewWallet: boolean("can_view_wallet").default(true), // السماح برؤية المحفظة
   canViewStats: boolean("can_view_stats").default(true), // السماح برؤية الإحصائيات
+  canViewProfile: boolean("can_view_profile").default(true), // السماح برؤية الملف الشخصي
   canToggleAvailability: boolean("can_toggle_availability").default(true), // السماح بتغيير حالة التوفر
+  allowVehicleEdit: boolean("allow_vehicle_edit").default(true), // السماح بتعديل بيانات المركبة
   notes: text("notes"), // ملاحظات عن السائق
   joinDate: timestamp("join_date").defaultNow(), // تاريخ الانضمام
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -730,6 +732,11 @@ export const insertDriverSchema = createInsertSchema(drivers).extend({
   currentLocation: true,
   updatedAt: true,
   allowProfileEdit: true,
+  allowVehicleEdit: true,
+  canViewProfile: true,
+  canViewWallet: true,
+  canViewStats: true,
+  canToggleAvailability: true,
   notes: true,
   joinDate: true,
 });

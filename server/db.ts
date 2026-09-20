@@ -2744,6 +2744,47 @@ async getNotifications(recipientType?: string, recipientId?: string, unread?: bo
       .orderBy(asc(messages.createdAt));
   }
 
+  async getAdminChatMessages(userId: string, userType: string): Promise<Message[]> {
+    return await this.db.select().from(messages)
+      .where(
+        and(
+          isNull(messages.orderId),
+          or(
+            and(eq(messages.senderId, userId), eq(messages.senderType, userType), eq(messages.receiverType, 'admin')),
+            and(eq(messages.receiverId, userId), eq(messages.receiverType, userType), eq(messages.senderType, 'admin'))
+          )
+        )
+      )
+      .orderBy(asc(messages.createdAt));
+  }
+
+  async getAdminConversations(): Promise<any[]> {
+    // This is a complex query to get unique users who chatted with admin
+    // For now, we'll get all messages with receiverType='admin' or senderType='admin' and orderId is null
+    const allMessages = await this.db.select().from(messages)
+      .where(isNull(messages.orderId))
+      .orderBy(desc(messages.createdAt));
+    
+    const conversations = new Map();
+    allMessages.forEach(msg => {
+      const otherUserId = msg.senderType === 'admin' ? msg.receiverId : msg.senderId;
+      const otherUserType = msg.senderType === 'admin' ? msg.receiverType : msg.senderType;
+      const key = `${otherUserType}:${otherUserId}`;
+      
+      if (!conversations.has(key)) {
+        conversations.set(key, {
+          userId: otherUserId,
+          userType: otherUserType,
+          lastMessage: msg.content,
+          lastMessageAt: msg.createdAt,
+          isRead: msg.senderType === 'admin' ? true : msg.isRead
+        });
+      }
+    });
+    
+    return Array.from(conversations.values());
+  }
+
   async createMessage(message: InsertMessage): Promise<Message> {
     const [newMessage] = await this.db.insert(messages).values(message).returning();
     return newMessage;

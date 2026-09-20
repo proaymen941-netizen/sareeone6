@@ -990,6 +990,11 @@ router.get("/stats", requireDriverAuth, async (req: AuthenticatedRequest, res) =
     const driver = await storage.getDriver(driverId);
     if (!driver) return res.status(404).json({ error: "السائق غير موجود" });
 
+    // التحقق من صلاحية رؤية الإحصائيات
+    if (driver.canViewStats === false) {
+      return res.status(403).json({ error: "الوصول للإحصائيات موقوف من قبل الإدارة" });
+    }
+
     const driverBalance = await storage.getDriverBalance(driverId);
     const driverCommissions = await storage.getDriverCommissions(driverId);
 
@@ -1024,6 +1029,13 @@ router.get("/stats", requireDriverAuth, async (req: AuthenticatedRequest, res) =
 router.get("/balance", requireDriverAuth, async (req: AuthenticatedRequest, res) => {
   try {
     const driverId = req.driverId!;
+    const driver = await storage.getDriver(driverId);
+    
+    // التحقق من صلاحية رؤية المحفظة
+    if (driver && driver.canViewWallet === false) {
+      return res.status(403).json({ error: "الوصول للمحفظة موقوف من قبل الإدارة" });
+    }
+
     const balance = await storage.getDriverBalance(driverId);
     const transactions = await storage.getDriverTransactions(driverId);
     const withdrawals = await storage.getWithdrawalRequests(driverId, 'driver');
@@ -1049,6 +1061,15 @@ router.post("/status", requireDriverAuth, async (req: AuthenticatedRequest, res)
     }
 
     const isAvailable = status === 'available';
+    
+    // التحقق من صلاحية تغيير حالة التوفر
+    const driver = await storage.getDriver(driverId);
+    if (driver && driver.canToggleAvailability === false) {
+      return res.status(403).json({
+        error: "تغيير حالة التوفر موقوف حالياً من قبل الإدارة."
+      });
+    }
+
     await storage.updateDriver(driverId, { isAvailable });
 
     const ws = req.app.get('ws');
@@ -1227,13 +1248,6 @@ router.put("/profile", requireDriverAuth, async (req: AuthenticatedRequest, res)
     const driver = await storage.getDriver(driverId);
     if (!driver) return res.status(404).json({ error: "السائق غير موجود" });
 
-    // التحقق من صلاحية تعديل الملف الشخصي الممنوحة من الإدارة
-    if (driver.allowProfileEdit === false) {
-      return res.status(403).json({
-        error: "تعديل الملف الشخصي موقوف حالياً من قبل الإدارة. يرجى التواصل مع الإدارة لإجراء التعديلات."
-      });
-    }
-
     const {
       name,
       email,
@@ -1248,6 +1262,26 @@ router.put("/profile", requireDriverAuth, async (req: AuthenticatedRequest, res)
     } = req.body;
 
     const updates: any = {};
+
+    // التحقق من صلاحية تعديل الملف الشخصي
+    const profileFields = ['name', 'email', 'phone', 'password', 'newPassword'];
+    const updatingProfile = profileFields.some(field => req.body[field] !== undefined);
+    
+    if (updatingProfile && driver.allowProfileEdit === false) {
+      return res.status(403).json({
+        error: "تعديل الملف الشخصي موقوف حالياً من قبل الإدارة."
+      });
+    }
+
+    // التحقق من صلاحية تعديل بيانات المركبة
+    const vehicleFields = ['vehicleType', 'vehicleNumber'];
+    const updatingVehicle = vehicleFields.some(field => req.body[field] !== undefined);
+
+    if (updatingVehicle && driver.allowVehicleEdit === false) {
+      return res.status(403).json({
+        error: "تعديل بيانات المركبة موقوف حالياً من قبل الإدارة."
+      });
+    }
 
     // التحقق من تكرار الهاتف إذا تم تغييره
     if (phone !== undefined && typeof phone === 'string' && phone.trim()) {

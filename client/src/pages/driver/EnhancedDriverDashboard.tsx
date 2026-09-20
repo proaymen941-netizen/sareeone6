@@ -43,8 +43,11 @@ import {
   VolumeX,
   Zap,
   ShieldAlert,
-  Sparkles
+  Sparkles,
+  Bot,
+  MessageCircle as MessageIcon
 } from 'lucide-react';
+import ChatOverlay from '@/components/ChatOverlay';
 
 interface Order {
   id: string;
@@ -99,6 +102,7 @@ export default function EnhancedDriverDashboard({ driverId, onLogout }: Enhanced
   const [soundMuted, setSoundMuted] = useState(soundAlert.getMuted());
   const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [adminChatOpen, setAdminChatOpen] = useState(false);
   
   // Register with Android bridge if available
   useEffect(() => {
@@ -342,6 +346,14 @@ export default function EnhancedDriverDashboard({ driverId, onLogout }: Enhanced
   });
 
   const handleToggleStatus = () => {
+    if (!canToggleAvailability) {
+      toast({
+        title: 'عذراً',
+        description: 'ليس لديك صلاحية لتغيير حالة التوفر. يرجى التواصل مع الإدارة.',
+        variant: 'destructive'
+      });
+      return;
+    }
     const newStatus = driverStatus === 'available' ? 'offline' : 'available';
     toggleStatusMutation.mutate(newStatus);
   };
@@ -582,13 +594,14 @@ export default function EnhancedDriverDashboard({ driverId, onLogout }: Enhanced
     averageRating: 0,
   };
 
-  // Driver app UI settings visibility
-  const showWallet = getS('driver_show_wallet', 'true') !== 'false';
-  const showStats = getS('driver_show_stats', 'true') !== 'false';
-  const showProfile = getS('driver_show_profile', 'true') !== 'false';
+  // Driver app UI settings visibility - Merged with driver specific permissions
+  const showWallet = (getS('driver_show_wallet', 'true') !== 'false') && (driver.canViewWallet !== false);
+  const showStats = (getS('driver_show_stats', 'true') !== 'false') && (driver.canViewStats !== false);
+  const showProfile = (getS('driver_show_profile', 'true') !== 'false') && (driver.canViewProfile !== false);
   const showHistory = getS('driver_show_history', 'true') !== 'false';
+  const canToggleAvailability = driver.canToggleAvailability !== false;
 
-  // Nav Items - filtered by UI settings
+  // Nav Items - filtered by UI settings and permissions
   const navItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: Activity, visible: true },
     { id: 'available', label: 'الطلبات المتاحة', icon: Bell, visible: true },
@@ -1216,6 +1229,23 @@ export default function EnhancedDriverDashboard({ driverId, onLogout }: Enhanced
           />
         );
       })()}
+
+      {/* Floating Admin Chat Icon */}
+      <div className="fixed bottom-24 left-6 z-[2000]">
+        <button
+          onClick={() => setAdminChatOpen(true)}
+          className="w-14 h-14 rounded-full bg-green-600 text-white shadow-lg shadow-green-400/40 flex items-center justify-center hover:scale-110 transition-transform active:scale-95 border-2 border-white"
+          title="مراسلة الإدارة"
+        >
+          <Bot className="h-8 w-8" />
+        </button>
+      </div>
+
+      <ChatOverlay 
+        isOpen={adminChatOpen} 
+        onClose={() => setAdminChatOpen(false)} 
+        userType="driver"
+      />
     </div>
   );
 }

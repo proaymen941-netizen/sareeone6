@@ -265,6 +265,8 @@ export interface IStorage {
 
   // Chat/Messages
   getMessages(orderId: string): Promise<Message[]>;
+  getAdminChatMessages(userId: string, userType: string): Promise<Message[]>;
+  getAdminConversations(): Promise<any[]>;
   createMessage(message: InsertMessage): Promise<Message>;
   markMessagesAsRead(orderId: string, receiverId: string): Promise<void>;
 
@@ -353,6 +355,7 @@ export class MemStorage {
   private paymentGatewaysMap: Map<string, any>;
   private paymentMethodDocumentsMap: Map<string, any>;
   private notificationRepliesMap: Map<string, NotificationReply>;
+  private messagesMap: Map<string, Message>;
 
   // Add db property for compatibility with routes that access it directly
   get db() {
@@ -401,6 +404,7 @@ export class MemStorage {
     this.customerWalletsMap = new Map();
     this.customerWalletTransactionsMap = new Map();
     this.notificationRepliesMap = new Map();
+    this.messagesMap = new Map();
     
     this.initializeData();
   }
@@ -1464,6 +1468,8 @@ export class MemStorage {
       allowProfileEdit: driver.allowProfileEdit ?? true,
       canViewWallet: driver.canViewWallet ?? true,
       canViewStats: driver.canViewStats ?? true,
+      canViewProfile: driver.canViewProfile ?? true,
+      allowVehicleEdit: driver.allowVehicleEdit ?? true,
       canToggleAvailability: driver.canToggleAvailability ?? true,
       paymentMode: driver.paymentMode ?? "commission",
       salaryAmount: driver.salaryAmount ?? "0",
@@ -2079,6 +2085,69 @@ export class MemStorage {
     if (!reply) return false;
     this.notificationRepliesMap.set(id, { ...reply, isRead: true });
     return true;
+  }
+
+  // Chat/Messages
+  async getMessages(orderId: string): Promise<Message[]> {
+    return Array.from(this.messagesMap.values())
+      .filter(m => m.orderId === orderId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }
+
+  async getAdminChatMessages(userId: string, userType: string): Promise<Message[]> {
+    return Array.from(this.messagesMap.values())
+      .filter(m => 
+        !m.orderId && 
+        ((m.senderId === userId && m.senderType === userType && m.receiverType === 'admin') ||
+         (m.receiverId === userId && m.receiverType === userType && m.senderType === 'admin'))
+      )
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }
+
+  async getAdminConversations(): Promise<any[]> {
+    const allMessages = Array.from(this.messagesMap.values())
+      .filter(m => !m.orderId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    const conversations = new Map();
+    allMessages.forEach(msg => {
+      const otherUserId = msg.senderType === 'admin' ? msg.receiverId : msg.senderId;
+      const otherUserType = msg.senderType === 'admin' ? msg.receiverType : msg.senderType;
+      const key = `${otherUserType}:${otherUserId}`;
+      
+      if (!conversations.has(key)) {
+        conversations.set(key, {
+          userId: otherUserId,
+          userType: otherUserType,
+          lastMessage: msg.content,
+          lastMessageAt: msg.createdAt,
+          isRead: msg.senderType === 'admin' ? true : msg.isRead
+        });
+      }
+    });
+    
+    return Array.from(conversations.values());
+  }
+
+  async createMessage(message: InsertMessage): Promise<Message> {
+    const id = randomUUID();
+    const newMessage: Message = {
+      id,
+      ...message,
+      orderId: message.orderId || null,
+      isRead: false,
+      createdAt: new Date()
+    };
+    this.messagesMap.set(id, newMessage);
+    return newMessage;
+  }
+
+  async markMessagesAsRead(orderId: string, receiverId: string): Promise<void> {
+    Array.from(this.messagesMap.values())
+      .filter(m => m.orderId === orderId && m.receiverId === receiverId)
+      .forEach(m => {
+        this.messagesMap.set(m.id, { ...m, isRead: true });
+      });
   }
 
   // Search methods

@@ -16,7 +16,8 @@ import {
   X,
   Globe,
   MapPin,
-  Building2
+  Building2,
+  Bot
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -30,6 +31,7 @@ import { useLanguage } from '../context/LanguageContext';
 import TopBar from './TopBar';
 import Navbar from './Navbar';
 import AppClosedOverlay from './AppClosedOverlay';
+import ChatOverlay from './ChatOverlay';
 import { getAppStatus } from '../utils/restaurantHours';
 import CitySelectionModal from './CitySelectionModal';
 
@@ -46,6 +48,7 @@ export default function Layout({ children }: LayoutProps) {
   const { toast } = useToast();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [adminChatOpen, setAdminChatOpen] = useState(false);
   const [cityModalOpen, setCityModalOpen] = useState(false);
   const { getSetting } = useUiSettings();
 
@@ -497,6 +500,34 @@ export default function Layout({ children }: LayoutProps) {
       <CitySelectionModal 
         isOpen={cityModalOpen} 
         onClose={() => setCityModalOpen(false)} 
+      />
+
+      {/* Floating Admin Chat Icon */}
+      <div className="fixed bottom-24 left-6 z-[2000] md:bottom-8 md:left-8">
+        <button
+          onClick={() => {
+            if (!user) {
+              toast({
+                title: language === 'ar' ? 'يجب تسجيل الدخول' : 'Login Required',
+                description: language === 'ar' ? 'يرجى تسجيل الدخول لتتمكن من مراسلة الإدارة' : 'Please login to contact admin',
+                variant: 'destructive',
+              });
+              setLocation('/auth');
+              return;
+            }
+            setAdminChatOpen(true);
+          }}
+          className="w-14 h-14 rounded-full bg-primary text-white shadow-lg shadow-primary/40 flex items-center justify-center hover:scale-110 transition-transform active:scale-95 border-2 border-white"
+          title={language === 'ar' ? 'مراسلة الإدارة' : 'Contact Admin'}
+        >
+          <Bot className="h-8 w-8" />
+        </button>
+      </div>
+
+      <ChatOverlay 
+        isOpen={adminChatOpen} 
+        onClose={() => setAdminChatOpen(false)} 
+        userType="customer"
       />
     </div>
   );

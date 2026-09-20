@@ -42,6 +42,12 @@ interface DriverStats {
   isVerified: boolean;
   vehicleType: string;
   vehicleNumber: string;
+  allowProfileEdit: boolean;
+  allowVehicleEdit: boolean;
+  canViewWallet: boolean;
+  canViewStats: boolean;
+  canViewProfile: boolean;
+  canToggleAvailability: boolean;
   walletBalance: number;
   withdrawalRequests: Array<{
     id: string;
@@ -79,6 +85,40 @@ export default function AdminDriversAdvanced() {
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/admin/drivers/stats');
       return response.json();
+    },
+  });
+
+  // ✏️ تحديث صلاحيات السائق
+  const updateDriverPermissions = useMutation({
+    mutationFn: async ({ driverId, permissions }: { driverId: string; permissions: any }) => {
+      const response = await apiRequest('PUT', `/api/admin/drivers/${driverId}`, permissions);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/drivers/stats'] });
+      toast({
+        title: "تم تحديث الصلاحيات",
+        description: "تم تحديث صلاحيات السائق بنجاح",
+      });
+    },
+  });
+
+  // 🔄 تحديث صلاحيات جميع السائقين
+  const updateAllDriversPermissions = useMutation({
+    mutationFn: async (permissions: any) => {
+      // تنفيذ التحديث لجميع السائقين
+      const promises = drivers?.map(d => 
+        apiRequest('PUT', `/api/admin/drivers/${d.id}`, permissions)
+      ) || [];
+      await Promise.all(promises);
+      return { success: true };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/drivers/stats'] });
+      toast({
+        title: "تم تحديث الكل",
+        description: "تم تحديث صلاحيات جميع السائقين بنجاح",
+      });
     },
   });
 
@@ -298,6 +338,7 @@ export default function AdminDriversAdvanced() {
           <TabsTrigger value="active">النشطين</TabsTrigger>
           <TabsTrigger value="pending">بانتظار التحقق</TabsTrigger>
           <TabsTrigger value="withdrawals">طلبات السحب</TabsTrigger>
+          <TabsTrigger value="permissions">الصلاحيات</TabsTrigger>
           <TabsTrigger value="performance">تقارير الأداء</TabsTrigger>
         </TabsList>
 
@@ -498,7 +539,130 @@ export default function AdminDriversAdvanced() {
           </Card>
         </TabsContent>
 
-        {/* Tab 4: تقارير الأداء */}
+        {/* Tab 4: الصلاحيات */}
+        <TabsContent value="permissions" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                التحكم في صلاحيات السائقين
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* الصلاحيات العامة */}
+              <div className="bg-primary/5 p-4 rounded-xl border border-primary/10">
+                <h3 className="font-bold mb-4 flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-primary" />
+                  صلاحيات عامة (تطبق على جميع السائقين)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                    <div className="space-y-0.5">
+                      <Label>تعديل الملف الشخصي</Label>
+                      <p className="text-xs text-muted-foreground">السماح بتعديل الاسم والهاتف</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => updateAllDriversPermissions.mutate({ allowProfileEdit: true })}>تفعيل للكل</Button>
+                      <Button size="sm" variant="outline" className="text-red-600" onClick={() => updateAllDriversPermissions.mutate({ allowProfileEdit: false })}>تعطيل للكل</Button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                    <div className="space-y-0.5">
+                      <Label>تعديل بيانات المركبة</Label>
+                      <p className="text-xs text-muted-foreground">السماح بتعديل نوع ورقم المركبة</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => updateAllDriversPermissions.mutate({ allowVehicleEdit: true })}>تفعيل للكل</Button>
+                      <Button size="sm" variant="outline" className="text-red-600" onClick={() => updateAllDriversPermissions.mutate({ allowVehicleEdit: false })}>تعطيل للكل</Button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                    <div className="space-y-0.5">
+                      <Label>رؤية المحفظة</Label>
+                      <p className="text-xs text-muted-foreground">إظهار/إخفاء صفحة المحفظة</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => updateAllDriversPermissions.mutate({ canViewWallet: true })}>تفعيل للكل</Button>
+                      <Button size="sm" variant="outline" className="text-red-600" onClick={() => updateAllDriversPermissions.mutate({ canViewWallet: false })}>تعطيل للكل</Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* جدول الصلاحيات المخصصة */}
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-right">السائق</TableHead>
+                      <TableHead className="text-center">الملف الشخصي</TableHead>
+                      <TableHead className="text-center">بيانات المركبة</TableHead>
+                      <TableHead className="text-center">المحفظة</TableHead>
+                      <TableHead className="text-center">الإحصائيات</TableHead>
+                      <TableHead className="text-center">التوفر</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {drivers?.map((driver) => (
+                      <TableRow key={driver.id}>
+                        <TableCell className="text-right font-medium">{driver.name}</TableCell>
+                        <TableCell className="text-center">
+                          <Switch 
+                            checked={driver.allowProfileEdit !== false} 
+                            onCheckedChange={(checked) => updateDriverPermissions.mutate({ 
+                              driverId: driver.id, 
+                              permissions: { allowProfileEdit: checked } 
+                            })} 
+                          />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Switch 
+                            checked={driver.allowVehicleEdit !== false} 
+                            onCheckedChange={(checked) => updateDriverPermissions.mutate({ 
+                              driverId: driver.id, 
+                              permissions: { allowVehicleEdit: checked } 
+                            })} 
+                          />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Switch 
+                            checked={driver.canViewWallet !== false} 
+                            onCheckedChange={(checked) => updateDriverPermissions.mutate({ 
+                              driverId: driver.id, 
+                              permissions: { canViewWallet: checked } 
+                            })} 
+                          />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Switch 
+                            checked={driver.canViewStats !== false} 
+                            onCheckedChange={(checked) => updateDriverPermissions.mutate({ 
+                              driverId: driver.id, 
+                              permissions: { canViewStats: checked } 
+                            })} 
+                          />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Switch 
+                            checked={driver.canToggleAvailability !== false} 
+                            onCheckedChange={(checked) => updateDriverPermissions.mutate({ 
+                              driverId: driver.id, 
+                              permissions: { canToggleAvailability: checked } 
+                            })} 
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab 5: تقارير الأداء */}
         <TabsContent value="performance">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
