@@ -807,7 +807,7 @@ router.get("/presence", async (req, res) => {
           const ord = await storage.getOrder(String(orderId));
           if (ord) {
             if (userType === 'driver') {
-              isOnline = ws.isUserOnline(ord.driverId, 'driver') || ws.isUserOnline(ord.driverPhone, 'driver');
+              isOnline = ws.isUserOnline(ord.driverId, 'driver') || ws.isUserOnline((ord as any).driverPhone, 'driver');
             } else if (userType === 'customer') {
               isOnline = ws.isUserOnline(ord.customerId, 'customer') || ws.isUserOnline(ord.customerPhone, 'customer');
             }
@@ -850,7 +850,7 @@ router.post("/", async (req, res) => {
           const ord = await storage.getOrder(req.body.orderId);
           if (ord) {
             if (receiverType === 'driver') {
-              isDelivered = ws.isUserOnline(ord.driverId, 'driver') || ws.isUserOnline(ord.driverPhone, 'driver');
+              isDelivered = ws.isUserOnline(ord.driverId, 'driver') || ws.isUserOnline((ord as any).driverPhone, 'driver');
             } else if (receiverType === 'customer') {
               isDelivered = ws.isUserOnline(ord.customerId, 'customer') || ws.isUserOnline(ord.customerPhone, 'customer');
             }

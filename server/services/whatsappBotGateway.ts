@@ -132,10 +132,10 @@ class WhatsAppBotGatewayService {
 
     // حفظ الحالة في قاعدة البيانات
     try {
-      await storage.setUiSetting({ key: 'whatsapp_bot_status', value: 'connected', category: 'whatsapp_bot', description: 'حالة بوت الواتساب' });
-      await storage.setUiSetting({ key: 'whatsapp_bot_phone', value: `+${cleanPhone}`, category: 'whatsapp_bot', description: 'رقم بوت الواتساب المتصل' });
-      await storage.setUiSetting({ key: 'whatsapp_bot_name', value: pushName, category: 'whatsapp_bot', description: 'اسم الحساب في واتساب' });
-      await storage.setUiSetting({ key: 'whatsapp_bot_connected_at', value: now, category: 'whatsapp_bot', description: 'وقت الربط' });
+      await storage.setUiSetting('whatsapp_bot_status', 'connected');
+      await storage.setUiSetting('whatsapp_bot_phone', `+${cleanPhone}`);
+      await storage.setUiSetting('whatsapp_bot_name', pushName);
+      await storage.setUiSetting('whatsapp_bot_connected_at', now);
     } catch (e) {
       console.error('Error saving whatsapp bot settings:', e);
     }
@@ -154,8 +154,8 @@ class WhatsAppBotGatewayService {
     };
 
     try {
-      await storage.setUiSetting({ key: 'whatsapp_bot_status', value: 'disconnected', category: 'whatsapp_bot', description: 'حالة بوت الواتساب' });
-      await storage.setUiSetting({ key: 'whatsapp_bot_phone', value: '', category: 'whatsapp_bot', description: 'رقم بوت الواتساب' });
+      await storage.setUiSetting('whatsapp_bot_status', 'disconnected');
+      await storage.setUiSetting('whatsapp_bot_phone', '');
     } catch (e) {}
 
     console.log(`🔌 [WhatsApp Bot] تم فصل جلسة الواتساب.`);
@@ -183,12 +183,7 @@ class WhatsAppBotGatewayService {
       this.session.lastMessageSentAt = new Date().toISOString();
 
       try {
-        await storage.setUiSetting({
-          key: 'whatsapp_bot_sent_count',
-          value: String(this.session.totalMessagesSent),
-          category: 'whatsapp_bot',
-          description: 'عدد رسائل الواتساب المرسلة'
-        });
+        await storage.setUiSetting('whatsapp_bot_sent_count', String(this.session.totalMessagesSent));
       } catch (e) {}
 
       // Log success

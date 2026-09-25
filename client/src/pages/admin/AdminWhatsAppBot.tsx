@@ -96,14 +96,6 @@ export default function AdminWhatsAppBot() {
   // Fetch Meta Cloud config
   const { data: metaConfig } = useQuery<WhatsAppCloudConfig>({
     queryKey: ['/api/admin/whatsapp-config'],
-    onSuccess: (data) => {
-      if (data) {
-        setMetaAccessToken(data.accessToken || '');
-        setMetaPhoneNumberId(data.phoneNumberId || '');
-        setMetaSenderNumber(data.senderNumber || '967777146387');
-        setMetaTemplateName(data.templateName || '');
-      }
-    }
   });
 
   useEffect(() => {
