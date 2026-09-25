@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { GoogleMap, useJsApiLoader, Marker, Autocomplete } from '@react-google-maps/api';
-import { MapPin, Navigation, Search, Check, X, Loader2, AlertTriangle, ChevronDown } from 'lucide-react';
+import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
+import { MapPin, Navigation, Search, Check, X, Loader2, AlertTriangle, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import MapComponent from './MapComponent';
 
@@ -13,6 +13,20 @@ const defaultCenter = {
   lat: 15.3694,
   lng: 44.1910, // صنعاء، اليمن
 };
+
+const POPULAR_YEMEN_LOCATIONS = [
+  { name: 'حدة (صنعاء)', query: 'حدة، صنعاء', lat: 15.3188, lng: 44.1963 },
+  { name: 'السبعين', query: 'ميدان السبعين، صنعاء', lat: 15.3367, lng: 44.2045 },
+  { name: 'التحرير', query: 'ميدان التحرير، صنعاء', lat: 15.3533, lng: 44.2078 },
+  { name: 'شارع الستين', query: 'شارع الستين، صنعاء', lat: 15.3421, lng: 44.1754 },
+  { name: 'شارع الزبيري', query: 'شارع الزبيري، صنعاء', lat: 15.3508, lng: 44.2012 },
+  { name: 'بيت بوس', query: 'بيت بوس، صنعاء', lat: 15.2845, lng: 44.2034 },
+  { name: 'عدن - المنصورة', query: 'المنصورة، عدن', lat: 12.8600, lng: 44.9950 },
+  { name: 'عدن - كريتر', query: 'كريتر، عدن', lat: 12.7750, lng: 45.0350 },
+  { name: 'تعز', query: 'تعز، اليمن', lat: 13.5775, lng: 44.0189 },
+  { name: 'إب', query: 'إب، اليمن', lat: 13.9753, lng: 44.1708 },
+  { name: 'المكلا', query: 'المكلا، حضرموت', lat: 14.5425, lng: 49.1242 },
+];
 
 interface LocationData {
   lat: number;
@@ -50,7 +64,7 @@ export default function GoogleMapPicker({
   });
 
   const [marker, setMarker] = useState<{ lat: number; lng: number } | null>(
-    initialLocation || null
+    initialLocation || { lat: defaultCenter.lat, lng: defaultCenter.lng }
   );
   const [mapCenter, setMapCenter] = useState<[number, number]>([
     initialLocation?.lat || defaultCenter.lat,
@@ -64,7 +78,6 @@ export default function GoogleMapPicker({
   const [searchResults, setSearchResults] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
   // Close search dropdown on click outside
@@ -78,23 +91,34 @@ export default function GoogleMapPicker({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const onMapLoad = useCallback((map: google.maps.Map) => {
-    setMap(map);
+  const onMapLoad = useCallback((loadedMap: google.maps.Map) => {
+    setMap(loadedMap);
   }, []);
 
   const getAddressFromCoords = async (lat: number, lng: number) => {
     setLoading(true);
     try {
-      if (hasApiKey && window.google) {
+      // 1. Try server geocode reverse endpoint
+      const srvRes = await fetch(`/api/geocode/reverse?lat=${lat}&lng=${lng}`);
+      if (srvRes.ok) {
+        const srvData = await srvRes.json();
+        if (srvData && srvData.display_name) {
+          setAddress(srvData.display_name);
+          return;
+        }
+      }
+
+      // 2. Try Google Geocoder if loaded
+      if (hasApiKey && window.google?.maps?.Geocoder) {
         const geocoder = new window.google.maps.Geocoder();
         const response = await geocoder.geocode({ location: { lat, lng } });
-        if (response.results[0]) {
+        if (response.results?.[0]) {
           setAddress(response.results[0].formatted_address);
           return;
         }
       }
 
-      // Reverse geocoding via Nominatim
+      // 3. Fallback to OpenStreetMap Reverse
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=ar`
       );
@@ -116,28 +140,10 @@ export default function GoogleMapPicker({
     if (e.latLng) {
       const newPos = { lat: e.latLng.lat(), lng: e.latLng.lng() };
       setMarker(newPos);
+      setMapCenter([newPos.lat, newPos.lng]);
       getAddressFromCoords(newPos.lat, newPos.lng);
     }
   }, []);
-
-  const onPlaceSelected = () => {
-    if (autocompleteRef.current) {
-      const place = autocompleteRef.current.getPlace();
-      if (place.geometry && place.geometry.location) {
-        const newPos = {
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng()
-        };
-        setMarker(newPos);
-        setMapCenter([newPos.lat, newPos.lng]);
-        setAddress(place.formatted_address || '');
-        if (map) {
-          map.panTo(newPos);
-          map.setZoom(17);
-        }
-      }
-    }
-  };
 
   const handleSearch = async (queryText?: string) => {
     const q = (queryText ?? searchQuery).trim();
@@ -147,7 +153,7 @@ export default function GoogleMapPicker({
     setShowDropdown(false);
 
     try {
-      // 1. Check if user typed coordinates like "15.3694, 44.1910"
+      // 1. Direct coordinate format check (e.g. "15.3694, 44.1910")
       const coordMatch = q.match(/^([-+]?\d+(\.\d+)?)[,\s]+([-+]?\d+(\.\d+)?)$/);
       if (coordMatch) {
         const lat = parseFloat(coordMatch[1]);
@@ -157,54 +163,85 @@ export default function GoogleMapPicker({
           setMarker(newPos);
           setMapCenter([lat, lng]);
           setMapZoom(16);
+          if (map) {
+            map.panTo(newPos);
+            map.setZoom(16);
+          }
           getAddressFromCoords(lat, lng);
           setIsSearching(false);
           return;
         }
       }
 
-      // 2. OpenStreetMap Nominatim search
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&accept-language=ar&addressdetails=1&limit=5`
-      );
-      if (res.ok) {
-        const data: Array<{ display_name: string; lat: string; lon: string }> = await res.json();
-        if (data && data.length > 0) {
-          setSearchResults(data);
-          const top = data[0];
-          const lat = parseFloat(top.lat);
-          const lng = parseFloat(top.lon);
-          setMarker({ lat, lng });
-          setMapCenter([lat, lng]);
-          setMapZoom(16);
-          setAddress(top.display_name);
-
-          if (data.length > 1) {
-            setShowDropdown(true);
+      // 2. Query our comprehensive Server Geocoding endpoint
+      let foundList: Array<{ display_name: string; lat: string; lon: string }> = [];
+      try {
+        const res = await fetch(`/api/geocode/search?q=${encodeURIComponent(q)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            foundList = data;
           }
-        } else {
-          // Retry appending Yemen or general query if not found
-          const fallbackRes = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + ' اليمن')}&accept-language=ar&addressdetails=1&limit=5`
-          );
-          if (fallbackRes.ok) {
-            const fallbackData = await fallbackRes.json();
-            if (fallbackData && fallbackData.length > 0) {
-              setSearchResults(fallbackData);
-              const top = fallbackData[0];
-              const lat = parseFloat(top.lat);
-              const lng = parseFloat(top.lon);
-              setMarker({ lat, lng });
-              setMapCenter([lat, lng]);
-              setMapZoom(16);
-              setAddress(top.display_name);
-              if (fallbackData.length > 1) {
-                setShowDropdown(true);
-              }
-              setIsSearching(false);
-              return;
+        }
+      } catch (e) {
+        console.warn("Server geocode search error:", e);
+      }
+
+      // 3. Fallback to Google Geocoder if available
+      if (foundList.length === 0 && window.google?.maps?.Geocoder) {
+        try {
+          const geocoder = new window.google.maps.Geocoder();
+          const gResult = await geocoder.geocode({ address: q, componentRestrictions: { country: 'YE' } });
+          if (gResult.results && gResult.results.length > 0) {
+            foundList = gResult.results.map((r: any) => ({
+              display_name: r.formatted_address,
+              lat: r.geometry.location.lat().toString(),
+              lon: r.geometry.location.lng().toString()
+            }));
+          }
+        } catch (gErr) {
+          // ignore
+        }
+      }
+
+      // 4. Fallback to Photon
+      if (foundList.length === 0) {
+        try {
+          const photonRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q + ' Yemen')}&lang=default&limit=5`);
+          if (photonRes.ok) {
+            const pData = await photonRes.json();
+            if (pData?.features?.length > 0) {
+              foundList = pData.features.map((f: any) => ({
+                display_name: [f.properties.name, f.properties.street, f.properties.city, f.properties.country].filter(Boolean).join('، '),
+                lat: f.geometry.coordinates[1].toString(),
+                lon: f.geometry.coordinates[0].toString()
+              }));
             }
           }
+        } catch (pErr) {
+          // ignore
+        }
+      }
+
+      if (foundList.length > 0) {
+        setSearchResults(foundList);
+        const top = foundList[0];
+        const lat = parseFloat(top.lat);
+        const lng = parseFloat(top.lon);
+        const newPos = { lat, lng };
+
+        setMarker(newPos);
+        setMapCenter([lat, lng]);
+        setMapZoom(16);
+        setAddress(top.display_name);
+
+        if (map) {
+          map.panTo(newPos);
+          map.setZoom(16);
+        }
+
+        if (foundList.length > 1) {
+          setShowDropdown(true);
         }
       }
     } catch (err) {
@@ -217,12 +254,34 @@ export default function GoogleMapPicker({
   const handleSelectSearchResult = (item: { display_name: string; lat: string; lon: string }) => {
     const lat = parseFloat(item.lat);
     const lng = parseFloat(item.lon);
-    setMarker({ lat, lng });
+    const newPos = { lat, lng };
+
+    setMarker(newPos);
     setMapCenter([lat, lng]);
     setMapZoom(16);
     setAddress(item.display_name);
     setSearchQuery(item.display_name);
     setShowDropdown(false);
+
+    if (map) {
+      map.panTo(newPos);
+      map.setZoom(16);
+    }
+  };
+
+  const handleQuickPlaceSelect = (loc: typeof POPULAR_YEMEN_LOCATIONS[0]) => {
+    const newPos = { lat: loc.lat, lng: loc.lng };
+    setMarker(newPos);
+    setMapCenter([loc.lat, loc.lng]);
+    setMapZoom(16);
+    setAddress(loc.query);
+    setSearchQuery(loc.name);
+    setShowDropdown(false);
+
+    if (map) {
+      map.panTo(newPos);
+      map.setZoom(16);
+    }
   };
 
   const getCurrentLocation = useCallback(() => {
@@ -240,7 +299,7 @@ export default function GoogleMapPicker({
           getAddressFromCoords(newPos.lat, newPos.lng);
           if (map) {
             map.panTo(newPos);
-            map.setZoom(17);
+            map.setZoom(16);
           }
           setLoading(false);
         },
@@ -248,17 +307,17 @@ export default function GoogleMapPicker({
           setLoading(false);
           console.log("Geolocation permission denied or error");
         },
-        { enableHighAccuracy: true }
+        { enableHighAccuracy: true, timeout: 7000 }
       );
     }
-  }, [map, hasApiKey]);
+  }, [map]);
 
-  // Request location automatically when opened if no initial location
+  // Initial geocode fetch if address is missing
   useEffect(() => {
-    if (isOpen && !marker && !initialLocation) {
-      getCurrentLocation();
+    if (isOpen && marker && !address) {
+      getAddressFromCoords(marker.lat, marker.lng);
     }
-  }, [isOpen, marker, initialLocation, getCurrentLocation]);
+  }, [isOpen]);
 
   const handleConfirm = () => {
     if (marker) {
@@ -281,98 +340,117 @@ export default function GoogleMapPicker({
 
   // Search Header Component reused in both Leaflet and Google Maps modes
   const renderHeader = (title: string) => (
-    <div className="p-3 sm:p-4 border-b flex items-center justify-between bg-[#f06424] text-white gap-2 sm:gap-4 relative z-50">
-      {/* Title */}
-      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-        <MapPin className="h-5 w-5 text-white" />
-        <h2 className="font-bold text-sm sm:text-base whitespace-nowrap">{title}</h2>
-      </div>
-
-      {/* Embedded Search Bar (matching screenshot) */}
-      <div className="relative flex-1 max-w-xs sm:max-w-md mx-1 sm:mx-2" ref={searchContainerRef}>
-        <div className="flex items-center bg-white rounded-xl shadow-md border border-white/50 px-1 py-0.5">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                handleSearch();
-              }
-            }}
-            placeholder="أبحث هنا"
-            className="w-full py-1.5 px-3 text-xs sm:text-sm text-gray-900 placeholder-gray-400 bg-transparent border-none focus:outline-none text-right font-medium"
-            dir="rtl"
-          />
-          <button
-            type="button"
-            onClick={() => handleSearch()}
-            disabled={isSearching}
-            className="bg-[#f06424] hover:bg-orange-600 active:scale-95 text-white p-2 rounded-lg transition-all shrink-0 flex items-center justify-center shadow-sm"
-            title="بحث عن موقع"
-          >
-            {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-          </button>
+    <div className="flex flex-col bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 relative z-50">
+      <div className="p-3 sm:p-4 flex items-center justify-between gap-2 sm:gap-4 bg-gradient-to-r from-orange-600 to-[#f06424] text-white shadow-sm">
+        {/* Title */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+            <MapPin className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h2 className="font-bold text-sm sm:text-base leading-tight">{title}</h2>
+            <p className="text-[11px] text-orange-100 hidden sm:block">ابحث بالاسم أو حدد النقطة مباشرة على الخريطة</p>
+          </div>
         </div>
 
-        {/* Dropdown for search suggestions / results */}
-        {showDropdown && searchResults.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-[9999] max-h-56 overflow-y-auto" dir="rtl">
-            <div className="p-1.5 bg-orange-50 text-[11px] font-bold text-orange-800 border-b border-orange-100 flex items-center justify-between">
-              <span>نتائج البحث ({searchResults.length}):</span>
-              <button onClick={() => setShowDropdown(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            {searchResults.map((item, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => handleSelectSearchResult(item)}
-                className="w-full text-right p-2.5 hover:bg-orange-50/80 border-b border-gray-100 last:border-b-0 flex items-start gap-2 transition-colors group"
-              >
-                <MapPin className="h-4 w-4 text-[#f06424] mt-0.5 shrink-0 group-hover:scale-110 transition-transform" />
-                <span className="text-xs font-medium text-gray-800 line-clamp-2 leading-relaxed">
-                  {item.display_name}
-                </span>
-              </button>
-            ))}
+        {/* Embedded Search Bar */}
+        <div className="relative flex-1 max-w-sm sm:max-w-md mx-1 sm:mx-2" ref={searchContainerRef}>
+          <div className="flex items-center bg-white rounded-xl shadow-lg border border-orange-200 px-1 py-1">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSearch();
+                }
+              }}
+              placeholder="ابحث عن منطقة، شارع، معلم (مثال: حدة، السبعين)..."
+              className="w-full py-1 px-3 text-xs sm:text-sm text-gray-900 placeholder-gray-400 bg-transparent border-none focus:outline-none text-right font-medium"
+              dir="rtl"
+            />
+            <button
+              type="button"
+              onClick={() => handleSearch()}
+              disabled={isSearching}
+              className="bg-[#f06424] hover:bg-orange-700 active:scale-95 text-white px-3 py-1.5 rounded-lg transition-all shrink-0 flex items-center gap-1.5 shadow-sm text-xs font-bold"
+              title="بحث عن موقع"
+            >
+              {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              <span className="hidden sm:inline">بحث</span>
+            </button>
           </div>
-        )}
+
+          {/* Dropdown for search suggestions / results */}
+          {showDropdown && searchResults.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1.5 bg-white dark:bg-zinc-900 rounded-xl shadow-2xl border border-gray-200 dark:border-zinc-700 overflow-hidden z-[9999] max-h-60 overflow-y-auto" dir="rtl">
+              <div className="p-2 bg-orange-50 dark:bg-orange-950/40 text-[11px] font-bold text-orange-800 dark:text-orange-300 border-b border-orange-100 dark:border-orange-900/50 flex items-center justify-between">
+                <span>نتائج البحث المتاحة ({searchResults.length}):</span>
+                <button onClick={() => setShowDropdown(false)} className="text-gray-400 hover:text-gray-600">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {searchResults.map((item, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handleSelectSearchResult(item)}
+                  className="w-full text-right p-2.5 hover:bg-orange-50/80 dark:hover:bg-zinc-800 border-b border-gray-100 dark:border-zinc-800 last:border-b-0 flex items-start gap-2.5 transition-colors group"
+                >
+                  <MapPin className="h-4 w-4 text-[#f06424] mt-0.5 shrink-0 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-medium text-gray-800 dark:text-gray-200 line-clamp-2 leading-relaxed">
+                    {item.display_name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Close button */}
+        <button 
+          onClick={() => {
+            if (onCancel) onCancel();
+            onClose();
+          }} 
+          className="p-2 hover:bg-white/20 active:scale-95 rounded-xl transition-all shrink-0 text-white"
+          title="إغلاق"
+        >
+          <X className="h-5 w-5" />
+        </button>
       </div>
 
-      {/* Close button */}
-      <button 
-        onClick={() => {
-          if (onCancel) onCancel();
-          onClose();
-        }} 
-        className="p-1.5 hover:bg-white/20 rounded-full transition-colors shrink-0 text-white"
-        title="إغلاق"
-      >
-        <X className="h-5 w-5 sm:h-6 sm:w-6" />
-      </button>
+      {/* Quick Location Chips */}
+      <div className="px-3 py-2 bg-orange-50/60 dark:bg-zinc-800/60 flex items-center gap-1.5 overflow-x-auto no-scrollbar" dir="rtl">
+        <div className="flex items-center gap-1 text-[11px] font-bold text-orange-800 dark:text-orange-400 shrink-0 ml-1">
+          <Sparkles className="h-3.5 w-3.5 text-orange-500" />
+          <span>أماكن شائعة:</span>
+        </div>
+        {POPULAR_YEMEN_LOCATIONS.map((loc, idx) => (
+          <button
+            key={idx}
+            type="button"
+            onClick={() => handleQuickPlaceSelect(loc)}
+            className="text-[11px] font-medium bg-white dark:bg-zinc-900 hover:bg-orange-100 dark:hover:bg-zinc-700 text-gray-700 dark:text-gray-300 px-2.5 py-1 rounded-lg border border-orange-200/70 dark:border-zinc-700 transition-colors shrink-0 active:scale-95 shadow-2xs"
+          >
+            {loc.name}
+          </button>
+        ))}
+      </div>
     </div>
   );
 
   // Fallback to Leaflet if API Key is missing or error loading
   if (!hasApiKey || loadError) {
     return (
-      <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-2 sm:p-4" dir="rtl">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[9999] flex items-center justify-center p-2 sm:p-4" dir="rtl">
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100 dark:border-zinc-800">
           {/* Header with Search */}
-          {renderHeader("تحديد الموقع (نظام بديل)")}
-
-          {!hasApiKey && (
-            <div className="bg-[#fef9ee] p-3 flex items-center gap-3 text-[#92400e] text-xs sm:text-sm border-b border-amber-200">
-              <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
-              <p>مفتاح خرائط جوجل غير متوفر. تم تفعيل نظام الخرائط المفتوحة (Leaflet) كبديل لضمان استمرارية الخدمة.</p>
-            </div>
-          )}
+          {renderHeader("تحديد الموقع عبر الخريطة")}
 
           {/* Map */}
-          <div className="flex-1 relative bg-slate-100">
+          <div className="flex-1 relative bg-slate-100 dark:bg-zinc-950">
             <MapComponent
               center={mapCenter}
               zoom={mapZoom}
@@ -387,7 +465,7 @@ export default function GoogleMapPicker({
             
             <button
               type="button"
-              className="absolute bottom-6 left-6 w-11 h-11 rounded-full bg-[#5c2409] hover:bg-[#431804] text-white shadow-xl flex items-center justify-center transition-transform active:scale-95 border-2 border-white z-[1000]"
+              className="absolute bottom-6 left-6 w-11 h-11 rounded-full bg-[#f06424] hover:bg-orange-600 text-white shadow-xl flex items-center justify-center transition-transform active:scale-95 border-2 border-white dark:border-zinc-800 z-[1000]"
               onClick={getCurrentLocation}
               disabled={loading}
               title="تحديد موقعي الحالي"
@@ -397,15 +475,22 @@ export default function GoogleMapPicker({
           </div>
 
           {/* Footer Card & Actions */}
-          <div className="p-3 sm:p-4 border-t bg-white">
+          <div className="p-3 sm:p-4 border-t border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
             <div className="flex flex-col gap-3">
-              {/* Selected Location Box (Matching screenshot blue card) */}
-              <div className="flex items-start gap-2.5 bg-[#eff6ff] p-3 rounded-xl border border-[#dbeafe]">
-                <MapPin className="h-5 w-5 text-[#2563eb] mt-0.5 shrink-0" />
+              {/* Selected Location Box */}
+              <div className="flex items-start gap-2.5 bg-orange-50/70 dark:bg-orange-950/30 p-3 rounded-xl border border-orange-200 dark:border-orange-900/50">
+                <MapPin className="h-5 w-5 text-[#f06424] mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-[#2563eb] mb-0.5">الموقع المختار:</p>
-                  <p className="text-xs sm:text-sm text-gray-700 leading-snug font-medium break-words">
-                    {loading ? "جاري التحديد..." : address || "انقر على الخريطة لتحديد الموقع"}
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-bold text-orange-700 dark:text-orange-400">الموقع المختار:</p>
+                    {marker && (
+                      <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
+                        {marker.lat.toFixed(5)}, {marker.lng.toFixed(5)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 leading-snug font-medium break-words mt-0.5">
+                    {loading ? "جاري التحديد..." : address || "انقر على الخريطة أو ابحث لتحديد المكان"}
                   </p>
                 </div>
               </div>
@@ -414,7 +499,7 @@ export default function GoogleMapPicker({
               <div className="flex gap-2">
                 <Button 
                   variant="outline" 
-                  className="flex-1 h-11 rounded-xl text-gray-700 font-bold border-gray-300 hover:bg-gray-100" 
+                  className="flex-1 h-11 rounded-xl text-gray-700 dark:text-gray-300 font-bold border-gray-300 dark:border-zinc-700 hover:bg-gray-100 dark:hover:bg-zinc-800" 
                   onClick={() => {
                     if (onCancel) onCancel();
                     onClose();
@@ -441,22 +526,22 @@ export default function GoogleMapPicker({
   if (!isLoaded) {
     return (
       <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center" dir="rtl">
-        <div className="bg-white p-8 rounded-2xl flex flex-col items-center gap-4 shadow-2xl">
+        <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl flex flex-col items-center gap-4 shadow-2xl border border-gray-100 dark:border-zinc-800">
           <Loader2 className="h-8 w-8 animate-spin text-[#f06424]" />
-          <p className="text-sm font-bold text-gray-700">جاري تحميل الخريطة...</p>
+          <p className="text-sm font-bold text-gray-700 dark:text-gray-300">جاري تحميل الخريطة...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-2 sm:p-4" dir="rtl">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[9999] flex items-center justify-center p-2 sm:p-4" dir="rtl">
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100 dark:border-zinc-800">
         {/* Header with Search */}
-        {renderHeader("تحديد الموقع بدقة")}
+        {renderHeader("تحديد الموقع بدقة عبر الخريطة")}
 
         {/* Map */}
-        <div className="flex-1 relative bg-slate-100">
+        <div className="flex-1 relative bg-slate-100 dark:bg-zinc-950">
           <GoogleMap
             mapContainerStyle={mapContainerStyle}
             center={marker || initialLocation || defaultCenter}
@@ -474,7 +559,7 @@ export default function GoogleMapPicker({
 
           <button
             type="button"
-            className="absolute bottom-6 left-6 w-11 h-11 rounded-full bg-[#5c2409] hover:bg-[#431804] text-white shadow-xl flex items-center justify-center transition-transform active:scale-95 border-2 border-white z-[1000]"
+            className="absolute bottom-6 left-6 w-11 h-11 rounded-full bg-[#f06424] hover:bg-orange-600 text-white shadow-xl flex items-center justify-center transition-transform active:scale-95 border-2 border-white dark:border-zinc-800 z-[1000]"
             onClick={getCurrentLocation}
             disabled={loading}
             title="تحديد موقعي الحالي"
@@ -484,15 +569,22 @@ export default function GoogleMapPicker({
         </div>
 
         {/* Footer Card & Actions */}
-        <div className="p-3 sm:p-4 border-t bg-white">
+        <div className="p-3 sm:p-4 border-t border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
           <div className="flex flex-col gap-3">
             {/* Selected Location Box */}
-            <div className="flex items-start gap-2.5 bg-[#eff6ff] p-3 rounded-xl border border-[#dbeafe]">
-              <MapPin className="h-5 w-5 text-[#2563eb] mt-0.5 shrink-0" />
+            <div className="flex items-start gap-2.5 bg-orange-50/70 dark:bg-orange-950/30 p-3 rounded-xl border border-orange-200 dark:border-orange-900/50">
+              <MapPin className="h-5 w-5 text-[#f06424] mt-0.5 shrink-0" />
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-[#2563eb] mb-0.5">الموقع المختار:</p>
-                <p className="text-xs sm:text-sm text-gray-700 leading-snug font-medium break-words">
-                  {loading ? "جاري التحديد..." : address || "انقر على الخريطة لتحديد الموقع"}
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-bold text-orange-700 dark:text-orange-400">الموقع المختار:</p>
+                  {marker && (
+                    <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
+                      {marker.lat.toFixed(5)}, {marker.lng.toFixed(5)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 leading-snug font-medium break-words mt-0.5">
+                  {loading ? "جاري التحديد..." : address || "انقر على الخريطة أو ابحث لتحديد المكان"}
                 </p>
               </div>
             </div>
@@ -501,7 +593,7 @@ export default function GoogleMapPicker({
             <div className="flex gap-2">
               <Button 
                 variant="outline" 
-                className="flex-1 h-11 rounded-xl text-gray-700 font-bold border-gray-300 hover:bg-gray-100" 
+                className="flex-1 h-11 rounded-xl text-gray-700 dark:text-gray-300 font-bold border-gray-300 dark:border-zinc-700 hover:bg-gray-100 dark:hover:bg-zinc-800" 
                 onClick={() => {
                   if (onCancel) onCancel();
                   onClose();
@@ -524,4 +616,3 @@ export default function GoogleMapPicker({
     </div>
   );
 }
-

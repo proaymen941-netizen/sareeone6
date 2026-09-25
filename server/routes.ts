@@ -21,6 +21,7 @@ import restaurantAccountsRouter from "./routes/restaurant-accounts";
 import flutterRouter from "./routes/flutter";
 import wasalniRouter from "./routes/wasalni";
 import messagesRouter from "./routes/messages";
+import geocodeRouter from "./routes/geocode";
 import imageUploadRouter from "./imageUpload";
 import { ensureUploadsDir, UPLOADS_DIR } from "./localStorage";
 
@@ -107,6 +108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin and Advanced Routes
   app.use("/api/admin", adminRoutes);
   app.use("/api/messages", messagesRouter);
+  app.use("/api/geocode", geocodeRouter);
   app.use(["/api/restaurant-accounts", "/api/admin/restaurant-accounts"], restaurantAccountsRouter);
   registerAdvancedRoutes(app);
 
