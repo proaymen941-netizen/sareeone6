@@ -10,9 +10,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { apiRequest, queryClient } from '@/lib/queryClient'
-import { matchesSearchQuery, normalizeArabicText } from '@/lib/utils'
+import { matchesSearchQuery, normalizeArabicText, extractCoordsFromTextOrUrl } from '@/lib/utils'
 import { Restaurant, Category } from '@shared/schema'
-import { Plus, Search, Edit, Trash2, Store, MapPin, Clock, Star, Map as MapIcon, Loader2 } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, Store, MapPin, Clock, Star, Map as MapIcon, Loader2, Link2, ClipboardPaste } from 'lucide-react'
 import ImageUpload from '@/components/ImageUpload'
 import MapComponent from './maps/MapComponent'
 
@@ -189,11 +189,26 @@ export default function RestaurantManagement() {
   }
 
   const handleSearchMapLocation = async () => {
-    if (!mapSearchQuery.trim()) return
+    const q = mapSearchQuery.trim()
+    if (!q) return
     setIsSearchingMap(true)
     try {
-      // 1. Check server geocode API
-      const srvRes = await fetch(`/api/geocode/search?q=${encodeURIComponent(mapSearchQuery)}`)
+      // 1. Direct coordinate or Google Maps link extraction
+      const direct = extractCoordsFromTextOrUrl(q)
+      if (direct) {
+        setFormData(prev => ({
+          ...prev,
+          latitude: direct.lat.toString(),
+          longitude: direct.lng.toString(),
+          address: direct.title || prev.address || `${direct.lat.toFixed(6)}, ${direct.lng.toFixed(6)}`
+        }))
+        toast({ title: 'تم استخراج وتحديد الموقع بدقة من الرابط 🎯' })
+        setIsMapOpen(false)
+        return
+      }
+
+      // 2. Check server geocode API (supports names and shortened links)
+      const srvRes = await fetch(`/api/geocode/search?q=${encodeURIComponent(q)}`)
       if (srvRes.ok) {
         const data = await srvRes.json()
         if (Array.isArray(data) && data.length > 0) {
@@ -201,8 +216,8 @@ export default function RestaurantManagement() {
           return
         }
       }
-      // 2. Fallback to Photon Worldwide
-      const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(mapSearchQuery)}&limit=6`)
+      // 3. Fallback to Photon Worldwide
+      const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6`)
       const data = await response.json()
       if (data?.features && data.features.length > 0) {
         setMapSearchResults(data.features.map((f: any) => ({
@@ -211,7 +226,7 @@ export default function RestaurantManagement() {
           lon: f.geometry.coordinates[0].toString()
         })))
       } else {
-        toast({ title: 'لم يتم العثور على نتائج للموقع المدخل', description: 'يرجى تجربة اسم منطقة أو معلم معروف' })
+        toast({ title: 'لم يتم العثور على نتائج للموقع المدخل', description: 'يرجى تجربة اسم منطقة أو معلم معروف أو رابط خرائط جوجل' })
       }
     } catch (error) {
       console.error('Error searching location:', error)

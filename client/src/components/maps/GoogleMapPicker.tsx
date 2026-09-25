@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { MapPin, Navigation, Search, Check, X, Loader2, Globe, Sparkles } from 'lucide-react';
+import { MapPin, Navigation, Search, Check, X, Loader2, Globe, Sparkles, Link2, ClipboardPaste, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { extractCoordsFromTextOrUrl } from '@/lib/utils';
 import MapComponent from './MapComponent';
 
 const defaultCenter = {
@@ -113,36 +114,41 @@ export default function GoogleMapPicker({
     }
   };
 
+  const [linkDetected, setLinkDetected] = useState(false);
+
   const executeSearch = async (queryText: string, autoSelectFirst = true) => {
     const q = queryText.trim();
     if (!q) {
       setSearchResults([]);
       setShowDropdown(false);
+      setLinkDetected(false);
       return;
     }
 
     setIsSearching(true);
 
     try {
-      // 1. Direct coordinate format check (e.g. "24.7136, 46.6753" or "15.3694 44.1910")
-      const coordMatch = q.match(/^([-+]?\d+(\.\d+)?)[,\s]+([-+]?\d+(\.\d+)?)$/);
-      if (coordMatch) {
-        const lat = parseFloat(coordMatch[1]);
-        const lng = parseFloat(coordMatch[3]);
-        if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-          const newPos = { lat, lng };
-          setMarker(newPos);
-          setMapCenter([lat, lng]);
-          setMapZoom(16);
+      // 1. Check if input is a direct Google Maps URL or raw coordinates string
+      const directCoords = extractCoordsFromTextOrUrl(q);
+      if (directCoords) {
+        const { lat, lng, title } = directCoords;
+        const newPos = { lat, lng };
+        setMarker(newPos);
+        setMapCenter([lat, lng]);
+        setMapZoom(17);
+        setLinkDetected(true);
+        if (title) {
+          setAddress(title);
+        } else {
           getAddressFromCoords(lat, lng);
-          setIsSearching(false);
-          setShowDropdown(false);
-          return;
         }
+        setIsSearching(false);
+        setShowDropdown(false);
+        return;
       }
 
-      // 2. Query Worldwide Server Geocoding endpoint
-      let foundList: Array<{ display_name: string; lat: string; lon: string }> = [];
+      // 2. Query Worldwide Server Geocoding endpoint (which also resolves Google Maps shortlinks e.g. maps.app.goo.gl)
+      let foundList: Array<{ display_name: string; lat: string; lon: string; source?: string }> = [];
       try {
         const res = await fetch(`/api/geocode/search?q=${encodeURIComponent(q)}`);
         if (res.ok) {
@@ -178,7 +184,10 @@ export default function GoogleMapPicker({
         setSearchResults(foundList);
         setShowDropdown(true);
 
-        if (autoSelectFirst) {
+        const isLinkResult = foundList[0]?.source === 'google_maps_link';
+        setLinkDetected(isLinkResult);
+
+        if (autoSelectFirst || isLinkResult) {
           const top = foundList[0];
           const lat = parseFloat(top.lat);
           const lng = parseFloat(top.lon);
@@ -186,17 +195,32 @@ export default function GoogleMapPicker({
 
           setMarker(newPos);
           setMapCenter([lat, lng]);
-          setMapZoom(16);
+          setMapZoom(17);
           setAddress(top.display_name);
         }
       } else {
         setSearchResults([]);
         setShowDropdown(false);
+        setLinkDetected(false);
       }
     } catch (err) {
       console.error("Search error:", err);
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handlePasteClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setSearchQuery(text);
+        executeSearch(text, true);
+      }
+    } catch (e) {
+      // If clipboard permission is not granted, focus input
+      const input = searchContainerRef.current?.querySelector('input');
+      input?.focus();
     }
   };
 
@@ -304,7 +328,7 @@ export default function GoogleMapPicker({
               </div>
             </div>
 
-            {/* Embedded Search Bar with instant Dropdown */}
+            {/* Embedded Search Bar with instant Dropdown & Paste Support */}
             <div className="relative flex-1 max-w-sm sm:max-w-md mx-1 sm:mx-2" ref={searchContainerRef}>
               <div className="flex items-center bg-white rounded-xl shadow-lg border border-orange-200 px-1 py-1">
                 <input
@@ -317,10 +341,22 @@ export default function GoogleMapPicker({
                       executeSearch(searchQuery, true);
                     }
                   }}
-                  placeholder="ابحث بالاسم أو العنوان أو الإحداثيات..."
-                  className="w-full py-1.5 px-3 text-xs sm:text-sm text-gray-900 placeholder-gray-400 bg-transparent border-none focus:outline-none text-right font-medium"
+                  placeholder="ابحث بالاسم أو الصق رابط خرائط جوجل أو الإحداثيات..."
+                  className="w-full py-1.5 px-2.5 text-xs sm:text-sm text-gray-900 placeholder-gray-400 bg-transparent border-none focus:outline-none text-right font-medium"
                   dir="rtl"
                 />
+                
+                {/* Paste from clipboard button */}
+                <button
+                  type="button"
+                  onClick={handlePasteClipboard}
+                  className="p-1.5 text-orange-600 hover:bg-orange-50 active:scale-95 rounded-lg transition-colors shrink-0 text-xs font-semibold flex items-center gap-1 border border-orange-200/60 ml-1"
+                  title="لصق رابط من الحافظة"
+                >
+                  <ClipboardPaste className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-[10px]">لصق رابط</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => executeSearch(searchQuery, true)}
@@ -332,6 +368,14 @@ export default function GoogleMapPicker({
                   <span className="hidden sm:inline">بحث</span>
                 </button>
               </div>
+
+              {/* Link detected badge */}
+              {linkDetected && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700 rounded-lg p-1.5 text-[11px] text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5 shadow-md z-50">
+                  <Link2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                  <span className="font-semibold">تم التعرف على رابط خرائط جوجل وتحديد الموقع بدقة!</span>
+                </div>
+              )}
 
               {/* Dropdown for search suggestions / results */}
               {showDropdown && searchResults.length > 0 && (

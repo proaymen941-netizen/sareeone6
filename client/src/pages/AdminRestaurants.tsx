@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Store, Save, X, Clock, Star, Search, MapPin, Phone, Layers, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Edit, Trash2, Store, Save, X, Clock, Star, Search, MapPin, Phone, Layers, ChevronDown, ChevronUp, Link2, ClipboardPaste, Sparkles, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
-import { matchesSearchQuery, normalizeArabicText } from '@/lib/utils';
+import { matchesSearchQuery, normalizeArabicText, extractCoordsFromTextOrUrl } from '@/lib/utils';
 import type { Restaurant, Category, MenuItem } from '@shared/schema';
 import LocationPicker from '@/components/maps/GoogleMapPicker';
 
@@ -30,6 +30,8 @@ export default function AdminRestaurants() {
   const [newSectionName, setNewSectionName] = useState('');
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [editingSectionName, setEditingSectionName] = useState('');
+  const [googleMapsUrlInput, setGoogleMapsUrlInput] = useState('');
+  const [isResolvingUrl, setIsResolvingUrl] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -342,6 +344,87 @@ export default function AdminRestaurants() {
   const getCategoryName = (categoryId: string) => {
     const category = categories?.find(c => c.id === categoryId);
     return category?.name || 'غير محدد';
+  };
+
+  // استخراج وتحديد موقع المتجر بدقة من رابط خرائط جوجل (Google Maps Link)
+  const handleResolveGoogleMapsUrl = async (customUrl?: string) => {
+    const targetUrl = (customUrl || googleMapsUrlInput).trim();
+    if (!targetUrl) {
+      toast({
+        title: "يرجى إدخال رابط خرائط جوجل",
+        description: "الصق رابط خرائط جوجل مثل maps.app.goo.gl أو رابط المتصفح",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // 1. استخراج فوري من الرابط أو الإحداثيات (Direct client extraction)
+    const direct = extractCoordsFromTextOrUrl(targetUrl);
+    if (direct) {
+      setFormData(prev => ({
+        ...prev,
+        latitude: direct.lat.toString(),
+        longitude: direct.lng.toString(),
+        address: direct.title || prev.address || `${direct.lat.toFixed(6)}, ${direct.lng.toFixed(6)}`
+      }));
+      toast({
+        title: "تم استخراج الموقع بنجاح 🎯",
+        description: `خط العرض: ${direct.lat.toFixed(6)} | خط الطول: ${direct.lng.toFixed(6)}`
+      });
+      setGoogleMapsUrlInput('');
+      return;
+    }
+
+    // 2. تحليل الرابط القصير عبر السيرفر (Server shortlink resolution)
+    setIsResolvingUrl(true);
+    try {
+      const res = await fetch(`/api/geocode/resolve-url?url=${encodeURIComponent(targetUrl)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.lat && data.lon) {
+          setFormData(prev => ({
+            ...prev,
+            latitude: data.lat,
+            longitude: data.lon,
+            address: data.display_name || prev.address || `${data.lat}, ${data.lon}`
+          }));
+          toast({
+            title: "تم تحديد موقع المتجر بدقة من الرابط 🎯",
+            description: data.display_name || `تم تعبئة الإحداثيات بنجاح`
+          });
+          setGoogleMapsUrlInput('');
+          return;
+        }
+      }
+      toast({
+        title: "تعذر استخراج الموقع من الرابط",
+        description: "تأكد من نسخ رابط صحيح من تطبيق خرائط جوجل أو افتح الخريطة للتحديد",
+        variant: "destructive"
+      });
+    } catch (e) {
+      toast({
+        title: "خطأ في الاتصال بالخادم",
+        description: "يرجى المحاولة مرة أخرى",
+        variant: "destructive"
+      });
+    } finally {
+      setIsResolvingUrl(false);
+    }
+  };
+
+  const handlePasteClipboardToForm = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setGoogleMapsUrlInput(text);
+        handleResolveGoogleMapsUrl(text);
+      }
+    } catch (e) {
+      toast({
+        title: "يرجى لصق الرابط يدوياً",
+        description: "استخدم Ctrl+V أو اضغط باستمرار للصق الرابط في الحقل",
+      });
+    }
   };
   // فلترة المتاجر حسب البحث بدقة عالية وحساسية للأحرف والهمزات والكلمات المتعددة
   const filteredRestaurants = useMemo(() => {
@@ -687,15 +770,75 @@ export default function AdminRestaurants() {
                       </div>
 
                       <div className="space-y-3">
+                        {/* صندوق لصق رابط خرائط جوجل المباشر */}
+                        <div className="bg-orange-50/70 dark:bg-zinc-800/60 p-3 rounded-xl border border-orange-200/80 dark:border-zinc-700/80 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor="googleMapsLink" className="text-xs font-bold text-orange-950 dark:text-orange-300 flex items-center gap-1.5">
+                              <Link2 className="h-3.5 w-3.5 text-[#f06424]" />
+                              <span>لصق رابط المتجر من خرائط جوجل (Google Maps Link):</span>
+                            </Label>
+                            <span className="text-[10px] text-orange-700 dark:text-orange-400 font-semibold bg-orange-100/80 dark:bg-orange-950/60 px-2 py-0.5 rounded-full">
+                              دقة 100%
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              id="googleMapsLink"
+                              value={googleMapsUrlInput}
+                              onChange={(e) => setGoogleMapsUrlInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleResolveGoogleMapsUrl();
+                                }
+                              }}
+                              placeholder="الصق الرابط هنا (مثال: https://maps.app.goo.gl/... أو إحداثيات)..."
+                              className="h-10 text-xs bg-white dark:bg-zinc-900 border-orange-200 dark:border-zinc-700 text-left placeholder:text-right"
+                              dir="ltr"
+                              data-testid="input-google-maps-link"
+                            />
+                            <Button
+                              type="button"
+                              onClick={() => handleResolveGoogleMapsUrl()}
+                              disabled={isResolvingUrl || !googleMapsUrlInput.trim()}
+                              className="h-10 px-3 bg-[#f06424] hover:bg-orange-700 text-white font-bold text-xs shrink-0 rounded-xl"
+                              data-testid="button-extract-link-location"
+                            >
+                              {isResolvingUrl ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                              <span className="hidden sm:inline mr-1">استخراج</span>
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={handlePasteClipboardToForm}
+                              className="h-10 px-2.5 border-orange-300 dark:border-zinc-700 text-orange-700 dark:text-orange-300 hover:bg-orange-100/60 shrink-0 rounded-xl"
+                              title="لصق من الحافظة"
+                            >
+                              <ClipboardPaste className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+                            💡 انسخ رابط مشاركة الموقع من تطبيق خرائط جوجل والصقه هنا ليتم استخراج خطوط الطول والعرض والعنوان تلقائياً بدقة تامة.
+                          </p>
+                        </div>
+
+                        {/* خط فاصل أنيق */}
+                        <div className="flex items-center gap-2 my-1">
+                          <div className="h-px bg-gray-200 dark:bg-zinc-800 flex-1"></div>
+                          <span className="text-[11px] font-semibold text-gray-400">أو حدد عبر الخريطة التفاعلية</span>
+                          <div className="h-px bg-gray-200 dark:bg-zinc-800 flex-1"></div>
+                        </div>
+
                         {/* زر الخريطة الكبير والواضح */}
                         <Button
                           type="button"
                           onClick={() => setIsLocationPickerOpen(true)}
-                          className="w-full h-12 rounded-xl gap-2 font-bold bg-gradient-to-r from-[#f06424] to-orange-500 hover:from-orange-600 hover:to-orange-700 text-white shadow-md transition-all active:scale-[0.99]"
+                          className="w-full h-11 rounded-xl gap-2 font-bold bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-sm transition-all active:scale-[0.99]"
                           data-testid="button-open-maps"
                         >
-                          <MapPin className="h-5 w-5" />
-                          <span>فتح خريطة تحديد الموقع والبحث عن الأماكن</span>
+                          <MapPin className="h-4 w-4" />
+                          <span>فتح خريطة التحديد والبحث العالمية</span>
                         </Button>
 
                         {/* العنوان الكامل */}

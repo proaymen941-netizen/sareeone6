@@ -1,5 +1,6 @@
 import express from "express";
 import { normalizeArabic, stripDefiniteArticle, scoreArabicMatch } from "../utils/arabic-search";
+import { extractCoordsFromTextOrUrl, resolveGoogleMapsUrl } from "../utils/google-maps-parser";
 import { storage } from "../storage";
 
 const router = express.Router();
@@ -187,6 +188,52 @@ interface ScoredResult {
 }
 
 /**
+ * GET /api/geocode/resolve-url?url=...
+ * Resolves a Google Maps link (standard or shortened maps.app.goo.gl) to exact lat/lng
+ */
+router.get("/resolve-url", async (req, res) => {
+  try {
+    const rawUrl = (req.query.url as string || "").trim();
+    if (!rawUrl) {
+      return res.status(400).json({ error: "Missing url parameter" });
+    }
+
+    const resolved = await resolveGoogleMapsUrl(rawUrl);
+    if (!resolved) {
+      return res.status(404).json({ error: "Could not extract location from link" });
+    }
+
+    // Try reverse geocoding to get clean Arabic address
+    let displayName = resolved.title || `موقع من خرائط جوجل (${resolved.lat.toFixed(6)}, ${resolved.lng.toFixed(6)})`;
+    try {
+      const revRes = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${resolved.lat}&lon=${resolved.lng}&addressdetails=1&accept-language=ar,en`,
+        { headers: { "User-Agent": "SarieOne-Precision-App/1.0", "Accept-Language": "ar,en" } }
+      );
+      if (revRes.ok) {
+        const revData: any = await revRes.json();
+        if (revData?.display_name) {
+          displayName = resolved.title ? `${resolved.title} - ${revData.display_name}` : revData.display_name;
+        }
+      }
+    } catch (e) {
+      // Non-blocking
+    }
+
+    return res.json({
+      display_name: displayName,
+      lat: resolved.lat.toString(),
+      lon: resolved.lng.toString(),
+      title: resolved.title,
+      source: resolved.source
+    });
+  } catch (err) {
+    console.error("Resolve URL error:", err);
+    return res.status(500).json({ error: "Failed to resolve link" });
+  }
+});
+
+/**
  * GET /api/geocode/search?q=... (High-Precision Character-Sensitive & Normalized Worldwide Search)
  */
 router.get("/search", async (req, res) => {
@@ -196,21 +243,58 @@ router.get("/search", async (req, res) => {
       return res.json([]);
     }
 
-    // 1. Direct coordinate format matching (e.g. "24.7136, 46.6753" or "15.3694 44.1910")
-    const coordMatch = rawQuery.match(/^([-+]?\d+(\.\d+)?)[,\s]+([-+]?\d+(\.\d+)?)$/);
-    if (coordMatch) {
-      const lat = parseFloat(coordMatch[1]);
-      const lon = parseFloat(coordMatch[3]);
-      if (!isNaN(lat) && !isNaN(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+    // 1. Check if input is a Google Maps Link (standard, shortened, search, directions) or Coordinate format
+    const isGoogleMapsOrUrl = 
+      rawQuery.includes("maps.app.goo.gl") || 
+      rawQuery.includes("goo.gl/maps") || 
+      rawQuery.includes("google.com/maps") || 
+      rawQuery.includes("maps.google.") || 
+      rawQuery.startsWith("http://") || 
+      rawQuery.startsWith("https://") ||
+      rawQuery.startsWith("geo:");
+
+    if (isGoogleMapsOrUrl) {
+      const resolved = await resolveGoogleMapsUrl(rawQuery);
+      if (resolved) {
+        let displayName = resolved.title || `موقع من رابط خرائط جوجل (${resolved.lat.toFixed(6)}, ${resolved.lng.toFixed(6)})`;
+        try {
+          const revRes = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${resolved.lat}&lon=${resolved.lng}&addressdetails=1&accept-language=ar,en`,
+            { headers: { "User-Agent": "SarieOne-Precision-App/1.0", "Accept-Language": "ar,en" } }
+          );
+          if (revRes.ok) {
+            const revData: any = await revRes.json();
+            if (revData?.display_name) {
+              displayName = resolved.title ? `${resolved.title} - ${revData.display_name}` : revData.display_name;
+            }
+          }
+        } catch (e) {}
+
         return res.json([
           {
-            display_name: `إحداثيات محددة (${lat.toFixed(6)}, ${lon.toFixed(6)})`,
-            lat: lat.toString(),
-            lon: lon.toString(),
-            source: "coordinates"
+            display_name: displayName,
+            lat: resolved.lat.toString(),
+            lon: resolved.lng.toString(),
+            title: resolved.title,
+            source: "google_maps_link",
+            score: 10000
           }
         ]);
       }
+    }
+
+    // Direct coordinate format matching (e.g. "24.7136, 46.6753" or "15.3694 44.1910" or DMS)
+    const directCoords = extractCoordsFromTextOrUrl(rawQuery);
+    if (directCoords) {
+      return res.json([
+        {
+          display_name: directCoords.title || `إحداثيات محددة (${directCoords.lat.toFixed(6)}, ${directCoords.lng.toFixed(6)})`,
+          lat: directCoords.lat.toString(),
+          lon: directCoords.lng.toString(),
+          source: directCoords.source,
+          score: 5000
+        }
+      ]);
     }
 
     const scoredResults: ScoredResult[] = [];

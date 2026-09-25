@@ -83,3 +83,84 @@ export function matchesSearchQuery(targets: (string | null | undefined)[], query
 
   return false;
 }
+
+/**
+ * Parses coordinates directly from Google Maps URLs, Shortlinks, or raw coordinates
+ */
+export function extractCoordsFromTextOrUrl(input: string): { lat: number; lng: number; title?: string } | null {
+  if (!input) return null;
+  const str = input.trim();
+
+  // 1. Raw coordinates "15.3694, 44.1910"
+  const rawCoord = str.match(/^[-+]?([0-8]?\d(?:\.\d+)?|90(?:\.0+)?)[,\s]+[-+]?(180(?:\.0+)?|(?:1[0-7]\d|\d{1,2})(?:\.\d+)?)$/);
+  if (rawCoord) {
+    const lat = parseFloat(rawCoord[1]);
+    const lng = parseFloat(rawCoord[2]);
+    if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return { lat, lng };
+    }
+  }
+
+  // 2. DMS coordinates e.g. 15°22'09.8"N 44°11'27.6"E
+  const dmsMatch = str.match(/(\d+)°(\d+)'([\d.]+)"([NSEWnsew])\s*,?\s*(\d+)°(\d+)'([\d.]+)"([NSEWnsew])/);
+  if (dmsMatch) {
+    let lat = parseInt(dmsMatch[1], 10) + parseInt(dmsMatch[2], 10) / 60 + parseFloat(dmsMatch[3]) / 3600;
+    if (dmsMatch[4].toUpperCase() === "S") lat = -lat;
+    let lng = parseInt(dmsMatch[5], 10) + parseInt(dmsMatch[6], 10) / 60 + parseFloat(dmsMatch[7]) / 3600;
+    if (dmsMatch[8].toUpperCase() === "W") lng = -lng;
+    if (!isNaN(lat) && !isNaN(lng)) {
+      return { lat, lng };
+    }
+  }
+
+  let title: string | undefined;
+  const placeTitleMatch = str.match(/\/place\/([^/@?]+)/);
+  if (placeTitleMatch) {
+    try {
+      title = decodeURIComponent(placeTitleMatch[1].replace(/\+/g, " "));
+    } catch (e) {}
+  }
+
+  // 3. Google Maps @lat,lng
+  const atMatch = str.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (atMatch) {
+    const lat = parseFloat(atMatch[1]);
+    const lng = parseFloat(atMatch[2]);
+    if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return { lat, lng, title };
+    }
+  }
+
+  // 4. URL query parameters ?q=lat,lng, query=lat,lng, ll=lat,lng, daddr=lat,lng
+  const paramMatch = str.match(/[?&](?:q|query|daddr|saddr|ll|destination|center)=(-?\d+\.\d+)[,%20\s]+(-?\d+\.\d+)/i);
+  if (paramMatch) {
+    const lat = parseFloat(paramMatch[1]);
+    const lng = parseFloat(paramMatch[2]);
+    if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return { lat, lng, title };
+    }
+  }
+
+  // 5. Path coordinates /dir//15.3694,44.1910
+  const dirMatch = str.match(/\/(?:dir|search)\/[^/]*\/(-?\d+\.\d+)[,%20\s]+(-?\d+\.\d+)/i);
+  if (dirMatch) {
+    const lat = parseFloat(dirMatch[1]);
+    const lng = parseFloat(dirMatch[2]);
+    if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return { lat, lng, title };
+    }
+  }
+
+  // 6. Geo URI geo:15.3694,44.1910
+  const geoMatch = str.match(/geo:(-?\d+\.\d+),(-?\d+\.\d+)/i);
+  if (geoMatch) {
+    const lat = parseFloat(geoMatch[1]);
+    const lng = parseFloat(geoMatch[2]);
+    if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return { lat, lng };
+    }
+  }
+
+  return null;
+}
+
