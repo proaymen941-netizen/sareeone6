@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
-import { MapPin, Navigation, Search, Check, X, Loader2, Globe, Sparkles } from 'lucide-react';
+import { MapPin, Navigation, Search, Check, X, Loader2, Globe, Sparkles, Navigation2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import MapComponent from './MapComponent';
 
@@ -15,11 +15,13 @@ const defaultCenter = {
 };
 
 const POPULAR_GLOBAL_LOCATIONS = [
-  { name: 'صنعاء', query: 'صنعاء، اليمن', lat: 15.3694, lng: 44.1910 },
-  { name: 'حدة (صنعاء)', query: 'حي حدة، صنعاء', lat: 15.3188, lng: 44.1963 },
-  { name: 'عدن', query: 'مدينة عدن، اليمن', lat: 12.7855, lng: 45.0187 },
+  { name: 'صنعاء (حدة)', query: 'حي حدة، صنعاء', lat: 15.3188, lng: 44.1963 },
+  { name: 'صنعاء (السبعين)', query: 'ميدان السبعين، صنعاء', lat: 15.3367, lng: 44.2045 },
+  { name: 'عدن (المنصورة)', query: 'المنصورة، عدن', lat: 12.8600, lng: 44.9950 },
+  { name: 'تعز', query: 'مدينة تعز، اليمن', lat: 13.5775, lng: 44.0189 },
   { name: 'مكة المكرمة', query: 'مكة المكرمة، السعودية', lat: 21.3891, lng: 39.8579 },
   { name: 'الرياض', query: 'الرياض، السعودية', lat: 24.7136, lng: 46.6753 },
+  { name: 'جدة', query: 'جدة، السعودية', lat: 21.5433, lng: 39.1728 },
   { name: 'دبي', query: 'دبي، الإمارات', lat: 25.2048, lng: 55.2708 },
   { name: 'القاهرة', query: 'القاهرة، مصر', lat: 30.0444, lng: 31.2357 },
   { name: 'عمان', query: 'عمان، الأردن', lat: 31.9454, lng: 35.9284 },
@@ -68,7 +70,7 @@ export default function GoogleMapPicker({
     initialLocation?.lat || defaultCenter.lat,
     initialLocation?.lng || defaultCenter.lng
   ]);
-  const [mapZoom, setMapZoom] = useState(15);
+  const [mapZoom, setMapZoom] = useState(16);
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,6 +79,7 @@ export default function GoogleMapPicker({
   const [showDropdown, setShowDropdown] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Close search dropdown on click outside
   useEffect(() => {
@@ -88,6 +91,14 @@ export default function GoogleMapPicker({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Update center when initialLocation changes
+  useEffect(() => {
+    if (initialLocation?.lat && initialLocation?.lng) {
+      setMarker({ lat: initialLocation.lat, lng: initialLocation.lng });
+      setMapCenter([initialLocation.lat, initialLocation.lng]);
+    }
+  }, [initialLocation?.lat, initialLocation?.lng]);
 
   const onMapLoad = useCallback((loadedMap: google.maps.Map) => {
     setMap(loadedMap);
@@ -143,20 +154,23 @@ export default function GoogleMapPicker({
     }
   }, []);
 
-  const handleSearch = async (queryText?: string) => {
-    const q = (queryText ?? searchQuery).trim();
-    if (!q) return;
+  const executeSearch = async (queryText: string, autoSelectFirst = true) => {
+    const q = queryText.trim();
+    if (!q) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      return;
+    }
 
     setIsSearching(true);
-    setShowDropdown(false);
 
     try {
-      // 1. Direct coordinate format check (e.g. "24.7136, 46.6753")
+      // 1. Direct coordinate format check (e.g. "24.7136, 46.6753" or "15.3694 44.1910")
       const coordMatch = q.match(/^([-+]?\d+(\.\d+)?)[,\s]+([-+]?\d+(\.\d+)?)$/);
       if (coordMatch) {
         const lat = parseFloat(coordMatch[1]);
         const lng = parseFloat(coordMatch[3]);
-        if (!isNaN(lat) && !isNaN(lng)) {
+        if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
           const newPos = { lat, lng };
           setMarker(newPos);
           setMapCenter([lat, lng]);
@@ -167,11 +181,12 @@ export default function GoogleMapPicker({
           }
           getAddressFromCoords(lat, lng);
           setIsSearching(false);
+          setShowDropdown(false);
           return;
         }
       }
 
-      // 2. Query our comprehensive Worldwide Server Geocoding endpoint
+      // 2. Query Worldwide Server Geocoding endpoint
       let foundList: Array<{ display_name: string; lat: string; lon: string }> = [];
       try {
         const res = await fetch(`/api/geocode/search?q=${encodeURIComponent(q)}`);
@@ -185,7 +200,7 @@ export default function GoogleMapPicker({
         console.warn("Server geocode search error:", e);
       }
 
-      // 3. Fallback to Google Geocoder if available (Worldwide without country lock)
+      // 3. Fallback to Google Geocoder if available (Worldwide)
       if (foundList.length === 0 && window.google?.maps?.Geocoder) {
         try {
           const geocoder = new window.google.maps.Geocoder();
@@ -210,7 +225,7 @@ export default function GoogleMapPicker({
             const pData = await photonRes.json();
             if (pData?.features?.length > 0) {
               foundList = pData.features.map((f: any) => ({
-                display_name: [f.properties.name, f.properties.street, f.properties.city, f.properties.country].filter(Boolean).join('، '),
+                display_name: [f.properties.name, f.properties.street, f.properties.district, f.properties.city, f.properties.country].filter(Boolean).join('، '),
                 lat: f.geometry.coordinates[1].toString(),
                 lon: f.geometry.coordinates[0].toString()
               }));
@@ -223,29 +238,45 @@ export default function GoogleMapPicker({
 
       if (foundList.length > 0) {
         setSearchResults(foundList);
-        const top = foundList[0];
-        const lat = parseFloat(top.lat);
-        const lng = parseFloat(top.lon);
-        const newPos = { lat, lng };
+        setShowDropdown(true);
 
-        setMarker(newPos);
-        setMapCenter([lat, lng]);
-        setMapZoom(16);
-        setAddress(top.display_name);
+        if (autoSelectFirst) {
+          const top = foundList[0];
+          const lat = parseFloat(top.lat);
+          const lng = parseFloat(top.lon);
+          const newPos = { lat, lng };
 
-        if (map) {
-          map.panTo(newPos);
-          map.setZoom(16);
+          setMarker(newPos);
+          setMapCenter([lat, lng]);
+          setMapZoom(16);
+          setAddress(top.display_name);
+
+          if (map) {
+            map.panTo(newPos);
+            map.setZoom(16);
+          }
         }
-
-        if (foundList.length > 1) {
-          setShowDropdown(true);
-        }
+      } else {
+        setSearchResults([]);
+        setShowDropdown(false);
       }
     } catch (err) {
       console.error("Search error:", err);
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  // Search input change handler with instant debounced suggestions
+  const handleInputChange = (val: string) => {
+    setSearchQuery(val);
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    if (val.trim().length >= 2) {
+      debounceTimerRef.current = setTimeout(() => {
+        executeSearch(val, false);
+      }, 400);
+    } else {
+      setShowDropdown(false);
     }
   };
 
@@ -271,14 +302,14 @@ export default function GoogleMapPicker({
     const newPos = { lat: loc.lat, lng: loc.lng };
     setMarker(newPos);
     setMapCenter([loc.lat, loc.lng]);
-    setMapZoom(15);
+    setMapZoom(16);
     setAddress(loc.query);
     setSearchQuery(loc.name);
     setShowDropdown(false);
 
     if (map) {
       map.panTo(newPos);
-      map.setZoom(15);
+      map.setZoom(16);
     }
   };
 
@@ -339,41 +370,41 @@ export default function GoogleMapPicker({
   // Search Header Component reused in both Leaflet and Google Maps modes
   const renderHeader = (title: string) => (
     <div className="flex flex-col bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 relative z-50">
-      <div className="p-3 sm:p-4 flex items-center justify-between gap-2 sm:gap-4 bg-gradient-to-r from-orange-600 to-[#f06424] text-white shadow-sm">
+      <div className="p-3 sm:p-4 flex items-center justify-between gap-2 sm:gap-4 bg-gradient-to-r from-orange-600 via-[#f06424] to-amber-600 text-white shadow-sm">
         {/* Title */}
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="p-2 bg-white/20 rounded-xl backdrop-blur-xs">
             <Globe className="h-5 w-5 text-white" />
           </div>
           <div>
             <h2 className="font-bold text-sm sm:text-base leading-tight">{title}</h2>
-            <p className="text-[11px] text-orange-100 hidden sm:block">ابحث في جميع مدن ودول وعناوين العالم أو انقر على الخريطة</p>
+            <p className="text-[11px] text-orange-100 hidden sm:block">ابحث في جميع مدن ودول العالم بدقة أو انقر مباشرة على الخريطة</p>
           </div>
         </div>
 
-        {/* Embedded Search Bar */}
+        {/* Embedded Search Bar with instant Dropdown */}
         <div className="relative flex-1 max-w-sm sm:max-w-md mx-1 sm:mx-2" ref={searchContainerRef}>
           <div className="flex items-center bg-white rounded-xl shadow-lg border border-orange-200 px-1 py-1">
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
-                  handleSearch();
+                  executeSearch(searchQuery, true);
                 }
               }}
-              placeholder="ابحث عن أي مدينة، شارع، عنوان في العالم (مثال: دبي، الرياض، لندن)..."
-              className="w-full py-1 px-3 text-xs sm:text-sm text-gray-900 placeholder-gray-400 bg-transparent border-none focus:outline-none text-right font-medium"
+              placeholder="ابحث بالاسم أو العنوان أو الإحداثيات..."
+              className="w-full py-1.5 px-3 text-xs sm:text-sm text-gray-900 placeholder-gray-400 bg-transparent border-none focus:outline-none text-right font-medium"
               dir="rtl"
             />
             <button
               type="button"
-              onClick={() => handleSearch()}
+              onClick={() => executeSearch(searchQuery, true)}
               disabled={isSearching}
-              className="bg-[#f06424] hover:bg-orange-700 active:scale-95 text-white px-3 py-1.5 rounded-lg transition-all shrink-0 flex items-center gap-1.5 shadow-sm text-xs font-bold"
-              title="بحث عالمي عن موقع"
+              className="bg-[#f06424] hover:bg-orange-700 active:scale-95 text-white px-3.5 py-1.5 rounded-lg transition-all shrink-0 flex items-center gap-1.5 shadow-sm text-xs font-bold"
+              title="بحث دقيق"
             >
               {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               <span className="hidden sm:inline">بحث</span>
@@ -382,9 +413,9 @@ export default function GoogleMapPicker({
 
           {/* Dropdown for search suggestions / results */}
           {showDropdown && searchResults.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1.5 bg-white dark:bg-zinc-900 rounded-xl shadow-2xl border border-gray-200 dark:border-zinc-700 overflow-hidden z-[9999] max-h-60 overflow-y-auto" dir="rtl">
+            <div className="absolute top-full left-0 right-0 mt-1.5 bg-white dark:bg-zinc-900 rounded-xl shadow-2xl border border-gray-200 dark:border-zinc-700 overflow-hidden z-[9999] max-h-64 overflow-y-auto" dir="rtl">
               <div className="p-2 bg-orange-50 dark:bg-orange-950/40 text-[11px] font-bold text-orange-800 dark:text-orange-300 border-b border-orange-100 dark:border-orange-900/50 flex items-center justify-between">
-                <span>نتائج البحث المتاحة ({searchResults.length}):</span>
+                <span>نتائج البحث المباشرة ({searchResults.length}):</span>
                 <button onClick={() => setShowDropdown(false)} className="text-gray-400 hover:text-gray-600">
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -394,12 +425,17 @@ export default function GoogleMapPicker({
                   key={idx}
                   type="button"
                   onClick={() => handleSelectSearchResult(item)}
-                  className="w-full text-right p-2.5 hover:bg-orange-50/80 dark:hover:bg-zinc-800 border-b border-gray-100 dark:border-zinc-800 last:border-b-0 flex items-start gap-2.5 transition-colors group"
+                  className="w-full text-right p-2.5 hover:bg-orange-50/90 dark:hover:bg-zinc-800 border-b border-gray-100 dark:border-zinc-800 last:border-b-0 flex items-start gap-2.5 transition-colors group"
                 >
                   <MapPin className="h-4 w-4 text-[#f06424] mt-0.5 shrink-0 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-medium text-gray-800 dark:text-gray-200 line-clamp-2 leading-relaxed">
-                    {item.display_name}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 leading-relaxed">
+                      {item.display_name}
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-mono">
+                      {parseFloat(item.lat).toFixed(4)}, {parseFloat(item.lon).toFixed(4)}
+                    </span>
+                  </div>
                 </button>
               ))}
             </div>
@@ -445,7 +481,7 @@ export default function GoogleMapPicker({
       <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[9999] flex items-center justify-center p-2 sm:p-4" dir="rtl">
         <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100 dark:border-zinc-800">
           {/* Header with Search */}
-          {renderHeader("البحث وتحديد الموقع على الخريطة (عالمي)")}
+          {renderHeader("تحديد موقع المتجر بدقة على الخريطة")}
 
           {/* Map */}
           <div className="flex-1 relative bg-slate-100 dark:bg-zinc-950">
@@ -454,7 +490,7 @@ export default function GoogleMapPicker({
               zoom={mapZoom}
               markers={marker ? [{
                 position: [marker.lat, marker.lng],
-                title: address || "الموقع المختار",
+                title: address || "موقع المتجر المحدد",
                 type: 'destination'
               }] : []}
               onLocationSelect={handleLeafletSelect}
@@ -463,7 +499,7 @@ export default function GoogleMapPicker({
             
             <button
               type="button"
-              className="absolute bottom-6 left-6 w-11 h-11 rounded-full bg-[#f06424] hover:bg-orange-600 text-white shadow-xl flex items-center justify-center transition-transform active:scale-95 border-2 border-white dark:border-zinc-800 z-[1000]"
+              className="absolute bottom-6 left-6 w-12 h-12 rounded-full bg-[#f06424] hover:bg-orange-600 text-white shadow-2xl flex items-center justify-center transition-transform active:scale-95 border-2 border-white dark:border-zinc-800 z-[1000]"
               onClick={getCurrentLocation}
               disabled={loading}
               title="تحديد موقعي الحالي"
@@ -480,15 +516,15 @@ export default function GoogleMapPicker({
                 <MapPin className="h-5 w-5 text-[#f06424] mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-bold text-orange-700 dark:text-orange-400">الموقع المختار:</p>
+                    <p className="text-xs font-bold text-orange-700 dark:text-orange-400">الموقع المختار للمتجر:</p>
                     {marker && (
-                      <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
-                        {marker.lat.toFixed(5)}, {marker.lng.toFixed(5)}
+                      <span className="text-[10px] font-mono text-gray-600 dark:text-gray-400 bg-white/70 dark:bg-zinc-800 px-2 py-0.5 rounded border border-orange-200/50">
+                        {marker.lat.toFixed(6)}, {marker.lng.toFixed(6)}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 leading-snug font-medium break-words mt-0.5">
-                    {loading ? "جاري التحديد..." : address || "انقر على الخريطة أو ابحث لتحديد المكان"}
+                  <p className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 leading-snug font-medium break-words mt-1">
+                    {loading ? "جاري جلب العنوان الدقيق..." : address || "انقر على الخريطة أو ابحث لتثبيت موقع المتجر"}
                   </p>
                 </div>
               </div>
@@ -511,7 +547,7 @@ export default function GoogleMapPicker({
                   onClick={handleConfirm}
                 >
                   <Check className="h-4 w-4" />
-                  تأكيد الموقع
+                  اعتماد وتثبيت الموقع
                 </Button>
               </div>
             </div>
@@ -536,7 +572,7 @@ export default function GoogleMapPicker({
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[9999] flex items-center justify-center p-2 sm:p-4" dir="rtl">
       <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100 dark:border-zinc-800">
         {/* Header with Search */}
-        {renderHeader("البحث وتحديد الموقع على الخريطة (عالمي)")}
+        {renderHeader("تحديد موقع المتجر بدقة على الخريطة")}
 
         {/* Map */}
         <div className="flex-1 relative bg-slate-100 dark:bg-zinc-950">
@@ -557,7 +593,7 @@ export default function GoogleMapPicker({
 
           <button
             type="button"
-            className="absolute bottom-6 left-6 w-11 h-11 rounded-full bg-[#f06424] hover:bg-orange-600 text-white shadow-xl flex items-center justify-center transition-transform active:scale-95 border-2 border-white dark:border-zinc-800 z-[1000]"
+            className="absolute bottom-6 left-6 w-12 h-12 rounded-full bg-[#f06424] hover:bg-orange-600 text-white shadow-2xl flex items-center justify-center transition-transform active:scale-95 border-2 border-white dark:border-zinc-800 z-[1000]"
             onClick={getCurrentLocation}
             disabled={loading}
             title="تحديد موقعي الحالي"
@@ -574,15 +610,15 @@ export default function GoogleMapPicker({
               <MapPin className="h-5 w-5 text-[#f06424] mt-0.5 shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-bold text-orange-700 dark:text-orange-400">الموقع المختار:</p>
+                  <p className="text-xs font-bold text-orange-700 dark:text-orange-400">الموقع المختار للمتجر:</p>
                   {marker && (
-                    <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
-                      {marker.lat.toFixed(5)}, {marker.lng.toFixed(5)}
+                    <span className="text-[10px] font-mono text-gray-600 dark:text-gray-400 bg-white/70 dark:bg-zinc-800 px-2 py-0.5 rounded border border-orange-200/50">
+                      {marker.lat.toFixed(6)}, {marker.lng.toFixed(6)}
                     </span>
                   )}
                 </div>
-                <p className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 leading-snug font-medium break-words mt-0.5">
-                  {loading ? "جاري التحديد..." : address || "انقر على الخريطة أو ابحث لتحديد المكان"}
+                <p className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 leading-snug font-medium break-words mt-1">
+                  {loading ? "جاري جلب العنوان الدقيق..." : address || "انقر على الخريطة أو ابحث لتثبيت موقع المتجر"}
                 </p>
               </div>
             </div>
@@ -605,7 +641,7 @@ export default function GoogleMapPicker({
                 onClick={handleConfirm}
               >
                 <Check className="h-4 w-4" />
-                تأكيد الموقع
+                اعتماد وتثبيت الموقع
               </Button>
             </div>
           </div>
