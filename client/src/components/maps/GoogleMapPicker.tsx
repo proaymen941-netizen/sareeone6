@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { MapPin, Navigation, Search, Check, X, Loader2, Globe, Sparkles, Link2, ClipboardPaste, ExternalLink } from 'lucide-react';
+import { MapPin, Navigation, Search, Check, X, Loader2, Globe, Sparkles, Link2, ClipboardPaste, ExternalLink, ChevronDown, ChevronUp, CheckCircle2, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { extractCoordsFromTextOrUrl } from '@/lib/utils';
 import MapComponent from './MapComponent';
@@ -59,8 +59,11 @@ export default function GoogleMapPicker({
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
+  const [searchResults, setSearchResults] = useState<Array<{ display_name: string; lat: string; lon: string; source?: string }>>([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isResultsPanelOpen, setIsResultsPanelOpen] = useState(true);
+  const [isResultsPanelMinimized, setIsResultsPanelMinimized] = useState(false);
+  const [selectedResultIndex, setSelectedResultIndex] = useState<number>(0);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -183,6 +186,9 @@ export default function GoogleMapPicker({
       if (foundList.length > 0) {
         setSearchResults(foundList);
         setShowDropdown(true);
+        setIsResultsPanelOpen(true);
+        setIsResultsPanelMinimized(false);
+        setSelectedResultIndex(0);
 
         const isLinkResult = foundList[0]?.source === 'google_maps_link';
         setLinkDetected(isLinkResult);
@@ -201,6 +207,7 @@ export default function GoogleMapPicker({
       } else {
         setSearchResults([]);
         setShowDropdown(false);
+        setIsResultsPanelOpen(false);
         setLinkDetected(false);
       }
     } catch (err) {
@@ -234,17 +241,28 @@ export default function GoogleMapPicker({
       }, 400);
     } else {
       setShowDropdown(false);
+      if (!val.trim()) {
+        setSearchResults([]);
+        setIsResultsPanelOpen(false);
+      }
     }
   };
 
-  const handleSelectSearchResult = (item: { display_name: string; lat: string; lon: string }) => {
+  const handleSelectSearchResult = (item: { display_name: string; lat: string; lon: string }, idx?: number) => {
     const lat = parseFloat(item.lat);
     const lng = parseFloat(item.lon);
     const newPos = { lat, lng };
 
+    if (typeof idx === 'number') {
+      setSelectedResultIndex(idx);
+    } else {
+      const foundIdx = searchResults.findIndex(r => r.lat === item.lat && r.lon === item.lon);
+      if (foundIdx !== -1) setSelectedResultIndex(foundIdx);
+    }
+
     setMarker(newPos);
     setMapCenter([lat, lng]);
-    setMapZoom(16);
+    setMapZoom(17);
     setAddress(item.display_name);
     setSearchQuery(item.display_name);
     setShowDropdown(false);
@@ -453,6 +471,121 @@ export default function GoogleMapPicker({
             onLocationSelect={handleLeafletSelect}
             height="100%"
           />
+
+          {/* Floating Live Search Results Panel over Map */}
+          {searchResults.length > 0 && isResultsPanelOpen && (
+            <div 
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 z-[1000] w-72 sm:w-88 max-w-[calc(100%-1.5rem)] bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-2xl shadow-2xl border border-orange-200 dark:border-zinc-700 overflow-hidden flex flex-col animate-in fade-in slide-in-from-top-2 duration-200 transition-all" 
+              dir="rtl"
+            >
+              {/* Panel Header */}
+              <div className="p-2.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white flex items-center justify-between shadow-xs">
+                <div className="flex items-center gap-2">
+                  <div className="p-1 bg-white/20 rounded-lg">
+                    <MapPin className="h-4 w-4 text-white" />
+                  </div>
+                  <span className="text-xs font-bold">
+                    نتائج البحث المباشرة ({searchResults.length}):
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsResultsPanelMinimized(!isResultsPanelMinimized)}
+                    className="p-1 hover:bg-white/20 rounded-lg transition-colors text-white text-xs flex items-center"
+                    title={isResultsPanelMinimized ? "توسيع النتائج" : "تصغير النتائج"}
+                  >
+                    {isResultsPanelMinimized ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsResultsPanelOpen(false)}
+                    className="p-1 hover:bg-white/20 rounded-lg transition-colors text-white"
+                    title="إغلاق النتائج"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Panel Body */}
+              {!isResultsPanelMinimized ? (
+                <div className="max-h-56 sm:max-h-64 overflow-y-auto divide-y divide-gray-100 dark:divide-zinc-800 p-1">
+                  {searchResults.map((item, idx) => {
+                    const isSelected = selectedResultIndex === idx;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleSelectSearchResult(item, idx)}
+                        className={`w-full text-right p-2.5 rounded-xl transition-all flex items-start gap-2.5 group my-0.5 ${
+                          isSelected 
+                            ? 'bg-orange-50 dark:bg-orange-950/60 border border-orange-300 dark:border-orange-700 shadow-xs' 
+                            : 'hover:bg-gray-50 dark:hover:bg-zinc-800 border border-transparent'
+                        }`}
+                      >
+                        <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 transition-colors ${
+                          isSelected 
+                            ? 'bg-orange-500 text-white' 
+                            : 'bg-orange-100 dark:bg-zinc-800 text-orange-600 dark:text-orange-400 group-hover:bg-orange-200'
+                        }`}>
+                          <span className="text-[11px] font-bold">#{idx + 1}</span>
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-xs font-bold text-gray-900 dark:text-gray-100 line-clamp-1 leading-snug">
+                              {item.display_name.split('،')[0] || item.display_name}
+                            </span>
+                            {isSelected && (
+                              <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-1.5 py-0.5 rounded-full font-semibold shrink-0 flex items-center gap-0.5">
+                                <CheckCircle2 className="h-3 w-3" />
+                                محدد
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-gray-600 dark:text-gray-400 line-clamp-2 mt-0.5 leading-relaxed">
+                            {item.display_name}
+                          </p>
+                          <div className="flex items-center justify-between mt-1 text-[10px] text-gray-400 font-mono">
+                            <span>{parseFloat(item.lat).toFixed(4)}, {parseFloat(item.lon).toFixed(4)}</span>
+                            <span className="text-orange-600 dark:text-orange-400 font-sans font-semibold group-hover:underline">
+                              تثبيت الموقع ←
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div 
+                  onClick={() => setIsResultsPanelMinimized(false)}
+                  className="p-2 text-center text-xs font-semibold text-orange-700 dark:text-orange-300 hover:bg-orange-50/50 cursor-pointer flex items-center justify-center gap-1"
+                >
+                  <span>عرض {searchResults.length} نتائج بحث متاحة</span>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Floating Re-open Results Button when closed */}
+          {searchResults.length > 0 && !isResultsPanelOpen && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsResultsPanelOpen(true);
+                setIsResultsPanelMinimized(false);
+              }}
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 z-[1000] bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-zinc-700 px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-1.5 text-xs font-bold hover:bg-orange-50 transition-transform active:scale-95"
+              dir="rtl"
+            >
+              <Layers className="h-3.5 w-3.5 text-orange-500" />
+              <span>نتائج البحث المباشرة ({searchResults.length})</span>
+            </button>
+          )}
           
           <button
             type="button"

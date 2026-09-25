@@ -515,27 +515,42 @@ export default function RestaurantManagement() {
 
                                 {/* Search Results Dropdown List */}
                                 {mapSearchResults.length > 0 && (
-                                  <div className="max-h-44 overflow-y-auto bg-white border-b divide-y divide-gray-100 z-10 shadow-inner">
-                                    {mapSearchResults.map((result: any, idx: number) => (
-                                      <button
-                                        key={idx}
+                                  <div className="bg-orange-50/80 dark:bg-zinc-800/80 border-b border-orange-200 dark:border-zinc-700 shadow-sm">
+                                    <div className="p-2 bg-orange-100/90 dark:bg-orange-950/60 text-[11px] font-bold text-orange-900 dark:text-orange-300 flex items-center justify-between border-b border-orange-200/50">
+                                      <span className="flex items-center gap-1.5">
+                                        <MapPin className="h-3.5 w-3.5 text-orange-600" />
+                                        نتائج البحث المباشرة ({mapSearchResults.length}):
+                                      </span>
+                                      <button 
                                         type="button"
-                                        className="w-full text-right p-2.5 hover:bg-orange-50 text-xs flex items-center justify-between gap-2 transition-colors"
-                                        onClick={() => {
-                                          const lat = parseFloat(result.lat);
-                                          const lon = parseFloat(result.lon);
-                                          handleMapSelect(lat, lon, result.display_name);
-                                          setMapSearchResults([]);
-                                          setMapSearchQuery('');
-                                        }}
+                                        onClick={() => setMapSearchResults([])} 
+                                        className="text-gray-500 hover:text-gray-700 text-[10px] font-medium"
                                       >
-                                        <div className="flex items-center gap-2 truncate">
-                                          <MapPin className="h-3.5 w-3.5 text-[#f06424] shrink-0" />
-                                          <span className="font-medium text-gray-800 truncate">{result.display_name}</span>
-                                        </div>
-                                        <span className="text-[10px] text-orange-600 shrink-0 bg-orange-100 px-2 py-0.5 rounded font-bold">اختيار</span>
+                                        إغلاق النتائج ✕
                                       </button>
-                                    ))}
+                                    </div>
+                                    <div className="max-h-44 overflow-y-auto divide-y divide-orange-100 dark:divide-zinc-700/50">
+                                      {mapSearchResults.map((result: any, idx: number) => (
+                                        <button
+                                          key={idx}
+                                          type="button"
+                                          className="w-full text-right p-2.5 hover:bg-orange-100/60 dark:hover:bg-zinc-700 text-xs flex items-center justify-between gap-2 transition-colors"
+                                          onClick={() => {
+                                            const lat = parseFloat(result.lat);
+                                            const lon = parseFloat(result.lon);
+                                            handleMapSelect(lat, lon, result.display_name);
+                                            setMapSearchResults([]);
+                                            setMapSearchQuery('');
+                                          }}
+                                        >
+                                          <div className="flex items-center gap-2 truncate">
+                                            <span className="text-[10px] font-bold bg-orange-200 text-orange-800 px-1.5 py-0.5 rounded shrink-0">#{idx + 1}</span>
+                                            <span className="font-medium text-gray-800 dark:text-gray-200 truncate">{result.display_name}</span>
+                                          </div>
+                                          <span className="text-[10px] text-white shrink-0 bg-[#f06424] hover:bg-orange-700 px-2.5 py-1 rounded-lg font-bold shadow-xs">تثبيت الموقع</span>
+                                        </button>
+                                      ))}
+                                    </div>
                                   </div>
                                 )}
 
