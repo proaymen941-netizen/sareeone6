@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { apiRequest, queryClient } from '@/lib/queryClient'
+import { matchesSearchQuery, normalizeArabicText } from '@/lib/utils'
 import { Restaurant, Category } from '@shared/schema'
 import { Plus, Search, Edit, Trash2, Store, MapPin, Clock, Star, Map as MapIcon, Loader2 } from 'lucide-react'
 import ImageUpload from '@/components/ImageUpload'
@@ -232,15 +233,33 @@ export default function RestaurantManagement() {
     return category?.name || 'غير محدد'
   }
 
-  const filteredRestaurants = restaurants.filter((restaurant) => {
-    const term = (searchTerm || '').toLowerCase().trim();
-    if (!term) return true;
-    return (
-      (restaurant.name || '').toLowerCase().includes(term) ||
-      (getCategoryName(restaurant.categoryId) || '').toLowerCase().includes(term) ||
-      (restaurant.address || '').toLowerCase().includes(term)
-    );
-  })
+  const filteredRestaurants = restaurants
+    .map(restaurant => {
+      const term = (searchTerm || '').trim();
+      if (!term) return { restaurant, score: 0 };
+      const catName = getCategoryName(restaurant.categoryId);
+      const fields = [
+        restaurant.name,
+        catName,
+        restaurant.address,
+        restaurant.description,
+      ].filter(Boolean);
+
+      const isMatch = matchesSearchQuery(fields, term);
+      if (!isMatch) return null;
+
+      let score = 0;
+      const normTerm = normalizeArabicText(term);
+      const normName = normalizeArabicText(restaurant.name || '');
+      if (normName === normTerm) score += 100;
+      else if (normName.startsWith(normTerm)) score += 50;
+      else if (normName.includes(normTerm)) score += 30;
+
+      return { restaurant, score };
+    })
+    .filter((item): item is { restaurant: Restaurant; score: number } => item !== null)
+    .sort((a, b) => b.score - a.score)
+    .map(item => item.restaurant);
 
   if (isLoading) {
     return (

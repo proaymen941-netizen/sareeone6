@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
+import { matchesSearchQuery, normalizeArabicText } from '@/lib/utils';
 import type { Restaurant, Category, MenuItem } from '@shared/schema';
 import LocationPicker from '@/components/maps/GoogleMapPicker';
 
@@ -342,17 +343,41 @@ export default function AdminRestaurants() {
     const category = categories?.find(c => c.id === categoryId);
     return category?.name || 'غير محدد';
   };
-  // فلترة المتاجر حسب البحث
-  const filteredRestaurants = restaurants.filter((restaurant) => {
-    const term = (searchTerm || '').toLowerCase().trim();
-    if (!term) return true;
-    return (
-      (restaurant.name || '').toLowerCase().includes(term) ||
-      (getCategoryName(restaurant.categoryId || '') || '').toLowerCase().includes(term) ||
-      (restaurant.address || '').toLowerCase().includes(term) ||
-      (restaurant.phone || '').toLowerCase().includes(term)
-    );
-  });
+  // فلترة المتاجر حسب البحث بدقة عالية وحساسية للأحرف والهمزات والكلمات المتعددة
+  const filteredRestaurants = useMemo(() => {
+    const term = (searchTerm || '').trim();
+    if (!term) return restaurants;
+
+    return restaurants
+      .map(restaurant => {
+        const catName = getCategoryName(restaurant.categoryId || '');
+        const fields = [
+          restaurant.name,
+          catName,
+          restaurant.address,
+          restaurant.phone,
+          (restaurant as any).description,
+          (restaurant as any).email,
+          (restaurant as any).city
+        ].filter(Boolean);
+
+        const isMatch = matchesSearchQuery(fields, term);
+        if (!isMatch) return null;
+
+        // حساب درجة الأهمية لترتيب النتائج بدقة (Google Maps-like ranking)
+        let score = 0;
+        const normTerm = normalizeArabicText(term);
+        const normName = normalizeArabicText(restaurant.name || '');
+        if (normName === normTerm) score += 100;
+        else if (normName.startsWith(normTerm)) score += 50;
+        else if (normName.includes(normTerm)) score += 30;
+
+        return { restaurant, score };
+      })
+      .filter((item): item is { restaurant: Restaurant; score: number } => item !== null)
+      .sort((a, b) => b.score - a.score)
+      .map(item => item.restaurant);
+  }, [restaurants, searchTerm, categories]);
 
   // فتح موقع المتجر على خرائط جوجل
   const openRestaurantOnMap = (restaurant: Restaurant) => {
