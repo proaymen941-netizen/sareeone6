@@ -2,82 +2,67 @@ import express from "express";
 
 const router = express.Router();
 
-// Rich Yemeni places database for instant, zero-latency, 100% reliable matching
-const YEMEN_KNOWN_PLACES = [
-  // صنعاء وأحيائها وشوارعها
-  { name: "حدة", fullName: "حي حدة، مديرية السبعين، صنعاء، اليمن", lat: 15.3188, lng: 44.1963, city: "صنعاء", type: "district" },
-  { name: "شارع حدة", fullName: "شارع حدة الرئيسي، صنعاء، اليمن", lat: 15.3214, lng: 44.1945, city: "صنعاء", type: "street" },
-  { name: "السبعين", fullName: "ميدان السبعين، صنعاء، اليمن", lat: 15.3367, lng: 44.2045, city: "صنعاء", type: "landmark" },
-  { name: "التحرير", fullName: "ميدان التحرير، وسط صنعاء، اليمن", lat: 15.3533, lng: 44.2078, city: "صنعاء", type: "landmark" },
-  { name: "شارع الزبيري", fullName: "شارع الزبيري، صنعاء، اليمن", lat: 15.3508, lng: 44.2012, city: "صنعاء", type: "street" },
-  { name: "شارع الستين", fullName: "شارع الستين الغربي، صنعاء، اليمن", lat: 15.3421, lng: 44.1754, city: "صنعاء", type: "street" },
-  { name: "شارع الخمسين", fullName: "شارع الخمسين، صنعاء، اليمن", lat: 15.3056, lng: 44.1989, city: "صنعاء", type: "street" },
-  { name: "بيت بوس", fullName: "حي بيت بوس، جنوب صنعاء، اليمن", lat: 15.2845, lng: 44.2034, city: "صنعاء", type: "district" },
-  { name: "الأصبحي", fullName: "حي الأصبحي، صنعاء، اليمن", lat: 15.3012, lng: 44.2156, city: "صنعاء", type: "district" },
-  { name: "شميلة", fullName: "سوق شميلة، صنعاء، اليمن", lat: 15.3167, lng: 44.2250, city: "صنعاء", type: "district" },
-  { name: "الحصبة", fullName: "حي الحصبة، شمال صنعاء، اليمن", lat: 15.3850, lng: 44.2056, city: "صنعاء", type: "district" },
-  { name: "باب اليمن", fullName: "باب اليمن، صنعاء القديمة، اليمن", lat: 15.3522, lng: 44.2158, city: "صنعاء", type: "landmark" },
-  { name: "صنعاء القديمة", fullName: "مدينة صنعاء القديمة، صنعاء، اليمن", lat: 15.3547, lng: 44.2144, city: "صنعاء", type: "district" },
-  { name: "الروضة", fullName: "منطقة الروضة، شمال صنعاء، اليمن", lat: 15.4200, lng: 44.2200, city: "صنعاء", type: "district" },
-  { name: "مذبح", fullName: "منطقة مذبح، غرب صنعاء، اليمن", lat: 15.3720, lng: 44.1680, city: "صنعاء", type: "district" },
-  { name: "شملان", fullName: "منطقة شملان، شمال غرب صنعاء، اليمن", lat: 15.4050, lng: 44.1500, city: "صنعاء", type: "district" },
-  { name: "الجراف", fullName: "حي الجراف، شمال صنعاء، اليمن", lat: 15.3900, lng: 44.2100, city: "صنعاء", type: "district" },
-  { name: "عصر", fullName: "منطقة عصر، غرب صنعاء، اليمن", lat: 15.3350, lng: 44.1650, city: "صنعاء", type: "district" },
-  { name: "شارع صخر", fullName: "شارع صخر، المتفرع من شارع بغداد، صنعاء، اليمن", lat: 15.3410, lng: 44.1980, city: "صنعاء", type: "street" },
-  { name: "شارع بغداد", fullName: "شارع بغداد، صنعاء، اليمن", lat: 15.3430, lng: 44.1990, city: "صنعاء", type: "street" },
-  { name: "شارع الجزائر", fullName: "شارع الجزائر، صنعاء، اليمن", lat: 15.3380, lng: 44.1950, city: "صنعاء", type: "street" },
-  { name: "شارع تعز", fullName: "شارع تعز، جنوب صنعاء، اليمن", lat: 15.3100, lng: 44.2300, city: "صنعاء", type: "street" },
-  { name: "جولة الرويشان", fullName: "جولة الرويشان، شارع حدة، صنعاء، اليمن", lat: 15.3355, lng: 44.1972, city: "صنعاء", type: "landmark" },
-  { name: "جولة المصباحي", fullName: "جولة المصباحي، شارع حدة، صنعاء، اليمن", lat: 15.3210, lng: 44.1940, city: "صنعاء", type: "landmark" },
-  { name: "جولة عصر", fullName: "جولة عصر، صنعاء، اليمن", lat: 15.3340, lng: 44.1660, city: "صنعاء", type: "landmark" },
-  { name: "مستشفى الثورة", fullName: "مستشفى الثورة العام، صنعاء، اليمن", lat: 15.3580, lng: 44.2250, city: "صنعاء", type: "landmark" },
-  { name: "جامعة صنعاء", fullName: "جامعة صنعاء الجديدة، الدائري الغربي، صنعاء، اليمن", lat: 15.3680, lng: 44.1820, city: "صنعاء", type: "landmark" },
+// Rich regional & global known places database for instantaneous zero-latency matching
+const KNOWN_PLACES = [
+  // مدن ومناطق يمنية
+  { name: "صنعاء", fullName: "مدينة صنعاء، اليمن", lat: 15.3694, lng: 44.1910, country: "اليمن" },
+  { name: "حدة", fullName: "حي حدة، مديرية السبعين، صنعاء، اليمن", lat: 15.3188, lng: 44.1963, country: "اليمن" },
+  { name: "شارع حدة", fullName: "شارع حدة الرئيسي، صنعاء، اليمن", lat: 15.3214, lng: 44.1945, country: "اليمن" },
+  { name: "السبعين", fullName: "ميدان السبعين، صنعاء، اليمن", lat: 15.3367, lng: 44.2045, country: "اليمن" },
+  { name: "التحرير", fullName: "ميدان التحرير، وسط صنعاء، اليمن", lat: 15.3533, lng: 44.2078, country: "اليمن" },
+  { name: "شارع الزبيري", fullName: "شارع الزبيري، صنعاء، اليمن", lat: 15.3508, lng: 44.2012, country: "اليمن" },
+  { name: "شارع الستين", fullName: "شارع الستين الغربي، صنعاء، اليمن", lat: 15.3421, lng: 44.1754, country: "اليمن" },
+  { name: "شارع الخمسين", fullName: "شارع الخمسين، صنعاء، اليمن", lat: 15.3056, lng: 44.1989, country: "اليمن" },
+  { name: "بيت بوس", fullName: "حي بيت بوس، جنوب صنعاء، اليمن", lat: 15.2845, lng: 44.2034, country: "اليمن" },
+  { name: "الأصبحي", fullName: "حي الأصبحي، صنعاء، اليمن", lat: 15.3012, lng: 44.2156, country: "اليمن" },
+  { name: "عدن", fullName: "مدينة عدن، اليمن", lat: 12.7855, lng: 45.0187, country: "اليمن" },
+  { name: "كريتر", fullName: "مديرية كريتر (صيرة)، عدن، اليمن", lat: 12.7750, lng: 45.0350, country: "اليمن" },
+  { name: "المنصورة", fullName: "مديرية المنصورة، عدن، اليمن", lat: 12.8600, lng: 44.9950, country: "اليمن" },
+  { name: "تعز", fullName: "مدينة تعز، اليمن", lat: 13.5775, lng: 44.0189, country: "اليمن" },
+  { name: "إب", fullName: "مدينة إب اللواء الأخضر، اليمن", lat: 13.9753, lng: 44.1708, country: "اليمن" },
+  { name: "المكلا", fullName: "مدينة المكلا، حضرموت، اليمن", lat: 14.5425, lng: 49.1242, country: "اليمن" },
+  { name: "الحديدة", fullName: "مدينة الحديدة، اليمن", lat: 14.7978, lng: 42.9545, country: "اليمن" },
+  { name: "مأرب", fullName: "مدينة مأرب، اليمن", lat: 15.4628, lng: 45.3253, country: "اليمن" },
 
-  // عدن وأحيائها
-  { name: "عدن", fullName: "مدينة عدن، اليمن", lat: 12.7855, lng: 45.0187, city: "عدن", type: "city" },
-  { name: "كريتر", fullName: "مديرية كريتر (صيرة)، عدن، اليمن", lat: 12.7750, lng: 45.0350, city: "عدن", type: "district" },
-  { name: "المعلا", fullName: "مديرية المعلا، عدن، اليمن", lat: 12.7880, lng: 45.0020, city: "عدن", type: "district" },
-  { name: "التواهي", fullName: "مديرية التواهي، عدن، اليمن", lat: 12.7820, lng: 44.9850, city: "عدن", type: "district" },
-  { name: "خور مكسر", fullName: "مديرية خور مكسر، عدن، اليمن", lat: 12.8250, lng: 45.0400, city: "عدن", type: "district" },
-  { name: "المنصورة", fullName: "مديرية المنصورة، عدن، اليمن", lat: 12.8600, lng: 44.9950, city: "عدن", type: "district" },
-  { name: "الشيخ عثمان", fullName: "مديرية الشيخ عثمان، عدن، اليمن", lat: 12.8750, lng: 45.0050, city: "عدن", type: "district" },
-  { name: "دار سعد", fullName: "مديرية دار سعد، عدن، اليمن", lat: 12.9000, lng: 45.0000, city: "عدن", type: "district" },
-  { name: "إنماء", fullName: "مدينة إنماء السكنية، المنصورة، عدن، اليمن", lat: 12.8550, lng: 44.9600, city: "عدن", type: "district" },
-
-  // تعز
-  { name: "تعز", fullName: "مدينة تعز، اليمن", lat: 13.5775, lng: 44.0189, city: "تعز", type: "city" },
-  { name: "شارع جمال", fullName: "شارع جمال عبدالناصر، وسط تعز، اليمن", lat: 13.5790, lng: 44.0150, city: "تعز", type: "street" },
-  { name: "الحوبان", fullName: "منطقة الحوبان، تعز، اليمن", lat: 13.6150, lng: 44.0850, city: "تعز", type: "district" },
-  { name: "بير باشا", fullName: "منطقة بير باشا، غرب تعز، اليمن", lat: 13.5700, lng: 43.9850, city: "تعز", type: "district" },
-
-  // إب
-  { name: "إب", fullName: "مدينة إب اللواء الأخضر، اليمن", lat: 13.9753, lng: 44.1708, city: "إب", type: "city" },
-  { name: "المشنة", fullName: "مديرية المشنة، إب، اليمن", lat: 13.9680, lng: 44.1780, city: "إب", type: "district" },
-  { name: "الظهار", fullName: "مديرية الظهار، إب، اليمن", lat: 13.9850, lng: 44.1650, city: "إب", type: "district" },
-  { name: "شارع العدين", fullName: "شارع العدين، إب، اليمن", lat: 13.9730, lng: 44.1720, city: "إب", type: "street" },
-
-  // حضرموت والمكلا
-  { name: "المكلا", fullName: "مدينة المكلا، ساحل حضرموت، اليمن", lat: 14.5425, lng: 49.1242, city: "حضرموت", type: "city" },
-  { name: "سيئون", fullName: "مدينة سيئون، وادي حضرموت، اليمن", lat: 15.9380, lng: 48.7880, city: "حضرموت", type: "city" },
-  { name: "الشرج", fullName: "حي الشرج، المكلا، حضرموت، اليمن", lat: 14.5380, lng: 49.1200, city: "حضرموت", type: "district" },
-  { name: "فوه", fullName: "منطقة فوه، المكلا، حضرموت، اليمن", lat: 14.5200, lng: 49.0700, city: "حضرموت", type: "district" },
-
-  // الحديدة
-  { name: "الحديدة", fullName: "مدينة الحديدة، عروس البحر الأحمر، اليمن", lat: 14.7978, lng: 42.9545, city: "الحديدة", type: "city" },
-  { name: "شارع الميناء", fullName: "شارع الميناء، الحديدة، اليمن", lat: 14.8050, lng: 42.9480, city: "الحديدة", type: "street" },
-  { name: "شارع صنعاء بالحديدة", fullName: "شارع صنعاء، الحديدة، اليمن", lat: 14.7920, lng: 42.9700, city: "الحديدة", type: "street" },
-
-  // مدن أخرى
-  { name: "ذمار", fullName: "مدينة ذمار، اليمن", lat: 14.5428, lng: 44.4056, city: "ذمار", type: "city" },
-  { name: "مأرب", fullName: "مدينة مأرب، اليمن", lat: 15.4628, lng: 45.3253, city: "مأرب", type: "city" },
-  { name: "عمران", fullName: "مدينة عمران، اليمن", lat: 15.6594, lng: 43.9408, city: "عمران", type: "city" },
-  { name: "صعدة", fullName: "مدينة صعدة، اليمن", lat: 16.9400, lng: 43.7636, city: "صعدة", type: "city" },
-  { name: "حجة", fullName: "مدينة حجة، اليمن", lat: 15.6944, lng: 43.6033, city: "حجة", type: "city" },
-  { name: "لحج", fullName: "مدينة الحوطة، لحج، اليمن", lat: 13.0600, lng: 44.8800, city: "لحج", type: "city" },
-  { name: "أبين", fullName: "مدينة زنجبار، أبين، اليمن", lat: 13.1289, lng: 45.3808, city: "أبين", type: "city" },
-  { name: "شبوة", fullName: "مدينة عتق، شبوة، اليمن", lat: 14.5378, lng: 46.8319, city: "شبوة", type: "city" },
-  { name: "المهرة", fullName: "مدينة الغيضة، المهرة، اليمن", lat: 16.2081, lng: 52.1764, city: "المهرة", type: "city" },
-  { name: "سقطرى", fullName: "مدينة حديبو، أرخبيل سقطرى، اليمن", lat: 12.6500, lng: 54.0200, city: "سقطرى", type: "city" }
+  // عواصم ومدن عربية وعالمية بارزة
+  { name: "مكة المكرمة", fullName: "مكة المكرمة، المملكة العربية السعودية", lat: 21.3891, lng: 39.8579, country: "السعودية" },
+  { name: "المدينة المنورة", fullName: "المدينة المنورة، المملكة العربية السعودية", lat: 24.5247, lng: 39.5692, country: "السعودية" },
+  { name: "الرياض", fullName: "مدينة الرياض، عاصمة المملكة العربية السعودية", lat: 24.7136, lng: 46.6753, country: "السعودية" },
+  { name: "جدة", fullName: "مدينة جدة، المملكة العربية السعودية", lat: 21.5433, lng: 39.1728, country: "السعودية" },
+  { name: "دبي", fullName: "إمارة دبي، الإمارات العربية المتحدة", lat: 25.2048, lng: 55.2708, country: "الإمارات" },
+  { name: "أبوظبي", fullName: "مدينة أبوظبي، عاصمة الإمارات العربية المتحدة", lat: 24.4539, lng: 54.3773, country: "الإمارات" },
+  { name: "الدوحة", fullName: "مدينة الدوحة، عاصمة قطر", lat: 25.2854, lng: 51.5310, country: "قطر" },
+  { name: "الكويت", fullName: "مدينة الكويت، عاصمة الكويت", lat: 29.3759, lng: 47.9774, country: "الكويت" },
+  { name: "المنامة", fullName: "مدينة المنامة، عاصمة البحرين", lat: 26.2285, lng: 50.5860, country: "البحرين" },
+  { name: "مسقط", fullName: "مدينة مسقط، عاصمة سلطنة عمان", lat: 23.5880, lng: 58.3829, country: "عمان" },
+  { name: "صلالة", fullName: "مدينة صلالة، سلطنة عمان", lat: 17.0151, lng: 54.0924, country: "عمان" },
+  { name: "القاهرة", fullName: "مدينة القاهرة، جمهورية مصر العربية", lat: 30.0444, lng: 31.2357, country: "مصر" },
+  { name: "الإسكندرية", fullName: "مدينة الإسكندرية، مصر", lat: 31.2001, lng: 29.9187, country: "مصر" },
+  { name: "عمان", fullName: "مدينة عمّان، عاصمة المملكة الأردنية الهاشمية", lat: 31.9454, lng: 35.9284, country: "الأردن" },
+  { name: "دمشق", fullName: "مدينة دمشق، عاصمة سوريا", lat: 33.5138, lng: 36.2765, country: "سوريا" },
+  { name: "بيروت", fullName: "مدينة بيروت، عاصمة لبنان", lat: 33.8938, lng: 35.5018, country: "لبنان" },
+  { name: "بغداد", fullName: "مدينة بغداد، عاصمة العراق", lat: 33.3152, lng: 44.3661, country: "العراق" },
+  { name: "أربيل", fullName: "مدينة أربيل، إقليم كردستان العراق", lat: 36.1901, lng: 44.0091, country: "العراق" },
+  { name: "القدس", fullName: "مدينة القدس الشريف، فلسطين", lat: 31.7683, lng: 35.2137, country: "فلسطين" },
+  { name: "غزة", fullName: "مدينة غزة، فلسطين", lat: 31.5017, lng: 34.4668, country: "فلسطين" },
+  { name: "الخرطوم", fullName: "مدينة الخرطوم، عاصمة السودان", lat: 15.5007, lng: 32.5599, country: "السودان" },
+  { name: "طرابلس", fullName: "مدينة طرابلس، عاصمة ليبيا", lat: 32.8872, lng: 13.1913, country: "ليبيا" },
+  { name: "تونس", fullName: "مدينة تونس، عاصمة الجمهورية التونسية", lat: 36.8065, lng: 10.1815, country: "تونس" },
+  { name: "الجزائر", fullName: "مدينة الجزائر العاصمة، الجمهورية الجزائرية", lat: 36.7538, lng: 3.0588, country: "الجزائر" },
+  { name: "الرباط", fullName: "مدينة الرباط، عاصمة المملكة المغربية", lat: 34.0209, lng: -6.8416, country: "المغرب" },
+  { name: "الدار البيضاء", fullName: "مدينة الدار البيضاء (كازابلانكا)، المغرب", lat: 33.5731, lng: -7.5898, country: "المغرب" },
+  { name: "اسطنبول", fullName: "مدينة اسطنبول، تركيا", lat: 41.0082, lng: 28.9784, country: "تركيا" },
+  { name: "أنقرة", fullName: "مدينة أنقرة، عاصمة تركيا", lat: 39.9334, lng: 32.8597, country: "تركيا" },
+  { name: "لندن", fullName: "مدينة لندن، عاصمة المملكة المتحدة", lat: 51.5074, lng: -0.1278, country: "بريطانيا" },
+  { name: "باريس", fullName: "مدينة باريس، عاصمة فرنسا", lat: 48.8566, lng: 2.3522, country: "فرنسا" },
+  { name: "برلين", fullName: "مدينة برلين، عاصمة ألمانيا", lat: 52.5200, lng: 13.4050, country: "ألمانيا" },
+  { name: "روما", fullName: "مدينة روما، عاصمة إيطاليا", lat: 41.9028, lng: 12.4964, country: "إيطاليا" },
+  { name: "مدريد", fullName: "مدينة مدريد، عاصمة إسبانيا", lat: 40.4168, lng: -3.7038, country: "إسبانيا" },
+  { name: "نيويورك", fullName: "مدينة نيويورك، الولايات المتحدة الأمريكية", lat: 40.7128, lng: -74.0060, country: "أمريكا" },
+  { name: "واشنطن", fullName: "مدينة واشنطن العاصمة، الولايات المتحدة الأمريكية", lat: 38.9072, lng: -77.0369, country: "أمريكا" },
+  { name: "طوكيو", fullName: "مدينة طوكيو، عاصمة اليابان", lat: 35.6762, lng: 139.6503, country: "اليابان" },
+  { name: "بكين", fullName: "مدينة بكين، عاصمة الصين", lat: 39.9042, lng: 116.4074, country: "الصين" },
+  { name: "موسكو", fullName: "مدينة موسكو، عاصمة روسيا", lat: 55.7558, lng: 37.6173, country: "روسيا" }
 ];
 
 function normalizeArabicText(text: string): string {
@@ -93,7 +78,7 @@ function normalizeArabicText(text: string): string {
 }
 
 /**
- * GET /api/geocode/search?q=...
+ * GET /api/geocode/search?q=... (Worldwide Global Search)
  */
 router.get("/search", async (req, res) => {
   try {
@@ -102,12 +87,12 @@ router.get("/search", async (req, res) => {
       return res.json([]);
     }
 
-    // 1. Check if user entered coordinates
+    // 1. Direct coordinate format matching (e.g. "24.7136, 46.6753" or "40.7128 -74.0060")
     const coordMatch = rawQuery.match(/^([-+]?\d+(\.\d+)?)[,\s]+([-+]?\d+(\.\d+)?)$/);
     if (coordMatch) {
       const lat = parseFloat(coordMatch[1]);
       const lon = parseFloat(coordMatch[3]);
-      if (!isNaN(lat) && !isNaN(lon)) {
+      if (!isNaN(lat) && !isNaN(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
         return res.json([
           {
             display_name: `إحداثيات محددة (${lat.toFixed(6)}, ${lon.toFixed(6)})`,
@@ -124,85 +109,78 @@ router.get("/search", async (req, res) => {
     const seenCoordinates = new Set<string>();
 
     const addResult = (item: { display_name: string; lat: string | number; lon: string | number; source?: string }) => {
-      const key = `${Number(item.lat).toFixed(4)},${Number(item.lon).toFixed(4)}`;
+      const key = `${Number(item.lat).toFixed(3)},${Number(item.lon).toFixed(3)}`;
       if (!seenCoordinates.has(key)) {
         seenCoordinates.add(key);
         results.push({
           display_name: item.display_name,
           lat: item.lat.toString(),
           lon: item.lon.toString(),
-          source: item.source || "yemen_db"
+          source: item.source || "global_db"
         });
       }
     };
 
-    // 2. Search in local Yemeni high-accuracy places
-    for (const place of YEMEN_KNOWN_PLACES) {
+    // 2. Search in instant global and regional locations
+    for (const place of KNOWN_PLACES) {
       const normPlaceName = normalizeArabicText(place.name);
       const normFullName = normalizeArabicText(place.fullName);
-      const normCity = normalizeArabicText(place.city);
+      const normCountry = normalizeArabicText(place.country || "");
 
       if (
+        normPlaceName === normQuery ||
         normPlaceName.includes(normQuery) ||
         normQuery.includes(normPlaceName) ||
         normFullName.includes(normQuery) ||
-        (normCity && normQuery.includes(normCity))
+        (normCountry && normQuery.includes(normCountry))
       ) {
         addResult({
           display_name: place.fullName,
           lat: place.lat,
           lon: place.lng,
-          source: "yemen_db"
+          source: "known_db"
         });
       }
     }
 
-    // 3. Query OpenStreetMap Nominatim with proper User-Agent & timeout
+    // 3. Search Worldwide using OpenStreetMap Nominatim (No country restriction)
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-      const queriesToTry = [
-        rawQuery.includes("اليمن") || rawQuery.includes("Yemen") ? rawQuery : `${rawQuery}, اليمن`,
-        rawQuery
-      ];
+      const osmUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(rawQuery)}&accept-language=ar,en&addressdetails=1&limit=8`;
+      const osmRes = await fetch(osmUrl, {
+        headers: {
+          "User-Agent": "SarieOne-Global-App/1.0 (contact@sarieone.app)",
+          "Accept-Language": "ar,en"
+        },
+        signal: controller.signal
+      });
 
-      for (const qStr of queriesToTry) {
-        if (results.length >= 6) break;
-        const osmUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(qStr)}&accept-language=ar&addressdetails=1&countrycodes=ye&limit=5`;
-        const osmRes = await fetch(osmUrl, {
-          headers: {
-            "User-Agent": "SarieOne-App/1.0 (contact@sarieone.app)",
-            "Accept-Language": "ar"
-          },
-          signal: controller.signal
-        });
-
-        if (osmRes.ok) {
-          const osmData: any[] = await osmRes.json();
-          if (Array.isArray(osmData)) {
-            for (const item of osmData) {
-              addResult({
-                display_name: item.display_name,
-                lat: item.lat,
-                lon: item.lon,
-                source: "osm"
-              });
-            }
+      if (osmRes.ok) {
+        const osmData: any[] = await osmRes.json();
+        if (Array.isArray(osmData)) {
+          for (const item of osmData) {
+            addResult({
+              display_name: item.display_name,
+              lat: item.lat,
+              lon: item.lon,
+              source: "osm_global"
+            });
           }
         }
       }
       clearTimeout(timeoutId);
     } catch (osmErr) {
-      // Nominatim timeout or network error, continue with other providers
+      // Ignore OSM timeout or network issue
     }
 
-    // 4. Query Photon by Komoot (very fast OSM search)
-    if (results.length < 5) {
+    // 4. Search Worldwide using Photon (Komoot Global OpenStreetMap API)
+    if (results.length < 6) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2500);
-        const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(rawQuery + " Yemen")}&lang=default&limit=4`;
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(rawQuery)}&lang=default&limit=8`;
         const photonRes = await fetch(photonUrl, { signal: controller.signal });
         if (photonRes.ok) {
           const photonData: any = await photonRes.json();
@@ -211,14 +189,14 @@ router.get("/search", async (req, res) => {
               const coords = feat.geometry?.coordinates;
               const props = feat.properties;
               if (coords && coords.length >= 2) {
-                const title = [props.name, props.street, props.district, props.city, props.country]
-                  .filter(Boolean)
-                  .join("، ");
+                const titleParts = [props.name, props.street, props.district, props.city, props.state, props.country]
+                  .filter(Boolean);
+                const title = titleParts.length > 0 ? titleParts.join("، ") : rawQuery;
                 addResult({
-                  display_name: title || rawQuery,
+                  display_name: title,
                   lat: coords[1],
                   lon: coords[0],
-                  source: "photon"
+                  source: "photon_global"
                 });
               }
             }
@@ -226,29 +204,19 @@ router.get("/search", async (req, res) => {
         }
         clearTimeout(timeoutId);
       } catch (photonErr) {
-        // Ignore fallback error
+        // Ignore photon fallback error
       }
-    }
-
-    // If still no results, fallback to Sana'a center with the query label
-    if (results.length === 0) {
-      results.push({
-        display_name: `${rawQuery} (صنعاء، اليمن)`,
-        lat: "15.3694",
-        lon: "44.1910",
-        source: "fallback"
-      });
     }
 
     return res.json(results);
   } catch (err) {
-    console.error("Geocoding search error:", err);
-    return res.status(500).json({ error: "Search failed" });
+    console.error("Global geocoding search error:", err);
+    return res.status(500).json({ error: "Global search failed" });
   }
 });
 
 /**
- * GET /api/geocode/reverse?lat=...&lng=...
+ * GET /api/geocode/reverse?lat=...&lng=... (Worldwide Reverse Geocoding)
  */
 router.get("/reverse", async (req, res) => {
   try {
@@ -259,15 +227,15 @@ router.get("/reverse", async (req, res) => {
       return res.status(400).json({ error: "Invalid coordinates" });
     }
 
-    // 1. Try reverse geocode with OSM Nominatim
+    // 1. Worldwide OpenStreetMap reverse geocoding
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=ar`;
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=ar,en`;
       const osmRes = await fetch(url, {
         headers: {
-          "User-Agent": "SarieOne-App/1.0 (contact@sarieone.app)",
-          "Accept-Language": "ar"
+          "User-Agent": "SarieOne-Global-App/1.0 (contact@sarieone.app)",
+          "Accept-Language": "ar,en"
         },
         signal: controller.signal
       });
@@ -288,11 +256,11 @@ router.get("/reverse", async (req, res) => {
       // Ignore and fallback
     }
 
-    // 2. Find closest Yemeni known landmark if within 5km
+    // 2. Find closest known landmark globally
     let closestPlace = null;
     let minDistance = Infinity;
 
-    for (const place of YEMEN_KNOWN_PLACES) {
+    for (const place of KNOWN_PLACES) {
       const dLat = (place.lat - lat) * 111;
       const dLng = (place.lng - lng) * 111 * Math.cos((lat * Math.PI) / 180);
       const distKm = Math.sqrt(dLat * dLat + dLng * dLng);
@@ -302,7 +270,7 @@ router.get("/reverse", async (req, res) => {
       }
     }
 
-    if (closestPlace && minDistance < 4) {
+    if (closestPlace && minDistance < 10) {
       return res.json({
         display_name: `بالقرب من ${closestPlace.fullName}`,
         lat,

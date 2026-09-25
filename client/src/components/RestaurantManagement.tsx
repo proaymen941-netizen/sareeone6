@@ -200,8 +200,8 @@ export default function RestaurantManagement() {
           return
         }
       }
-      // 2. Fallback to Photon
-      const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(mapSearchQuery + ' Yemen')}&limit=5`)
+      // 2. Fallback to Photon Worldwide
+      const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(mapSearchQuery)}&limit=6`)
       const data = await response.json()
       if (data?.features && data.features.length > 0) {
         setMapSearchResults(data.features.map((f: any) => ({

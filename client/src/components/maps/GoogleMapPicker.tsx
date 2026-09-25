@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
-import { MapPin, Navigation, Search, Check, X, Loader2, AlertTriangle, Sparkles } from 'lucide-react';
+import { MapPin, Navigation, Search, Check, X, Loader2, Globe, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import MapComponent from './MapComponent';
 
@@ -11,21 +11,20 @@ const mapContainerStyle = {
 
 const defaultCenter = {
   lat: 15.3694,
-  lng: 44.1910, // صنعاء، اليمن
+  lng: 44.1910, // صنعاء
 };
 
-const POPULAR_YEMEN_LOCATIONS = [
-  { name: 'حدة (صنعاء)', query: 'حدة، صنعاء', lat: 15.3188, lng: 44.1963 },
-  { name: 'السبعين', query: 'ميدان السبعين، صنعاء', lat: 15.3367, lng: 44.2045 },
-  { name: 'التحرير', query: 'ميدان التحرير، صنعاء', lat: 15.3533, lng: 44.2078 },
-  { name: 'شارع الستين', query: 'شارع الستين، صنعاء', lat: 15.3421, lng: 44.1754 },
-  { name: 'شارع الزبيري', query: 'شارع الزبيري، صنعاء', lat: 15.3508, lng: 44.2012 },
-  { name: 'بيت بوس', query: 'بيت بوس، صنعاء', lat: 15.2845, lng: 44.2034 },
-  { name: 'عدن - المنصورة', query: 'المنصورة، عدن', lat: 12.8600, lng: 44.9950 },
-  { name: 'عدن - كريتر', query: 'كريتر، عدن', lat: 12.7750, lng: 45.0350 },
-  { name: 'تعز', query: 'تعز، اليمن', lat: 13.5775, lng: 44.0189 },
-  { name: 'إب', query: 'إب، اليمن', lat: 13.9753, lng: 44.1708 },
-  { name: 'المكلا', query: 'المكلا، حضرموت', lat: 14.5425, lng: 49.1242 },
+const POPULAR_GLOBAL_LOCATIONS = [
+  { name: 'صنعاء', query: 'صنعاء، اليمن', lat: 15.3694, lng: 44.1910 },
+  { name: 'حدة (صنعاء)', query: 'حي حدة، صنعاء', lat: 15.3188, lng: 44.1963 },
+  { name: 'عدن', query: 'مدينة عدن، اليمن', lat: 12.7855, lng: 45.0187 },
+  { name: 'مكة المكرمة', query: 'مكة المكرمة، السعودية', lat: 21.3891, lng: 39.8579 },
+  { name: 'الرياض', query: 'الرياض، السعودية', lat: 24.7136, lng: 46.6753 },
+  { name: 'دبي', query: 'دبي، الإمارات', lat: 25.2048, lng: 55.2708 },
+  { name: 'القاهرة', query: 'القاهرة، مصر', lat: 30.0444, lng: 31.2357 },
+  { name: 'عمان', query: 'عمان، الأردن', lat: 31.9454, lng: 35.9284 },
+  { name: 'اسطنبول', query: 'اسطنبول، تركيا', lat: 41.0082, lng: 28.9784 },
+  { name: 'لندن', query: 'لندن، المملكة المتحدة', lat: 51.5074, lng: -0.1278 },
 ];
 
 interface LocationData {
@@ -59,8 +58,7 @@ export default function GoogleMapPicker({
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: apiKey || '',
     libraries,
-    language: 'ar',
-    region: 'YE'
+    language: 'ar'
   });
 
   const [marker, setMarker] = useState<{ lat: number; lng: number } | null>(
@@ -98,7 +96,7 @@ export default function GoogleMapPicker({
   const getAddressFromCoords = async (lat: number, lng: number) => {
     setLoading(true);
     try {
-      // 1. Try server geocode reverse endpoint
+      // 1. Try server geocode reverse endpoint (Worldwide)
       const srvRes = await fetch(`/api/geocode/reverse?lat=${lat}&lng=${lng}`);
       if (srvRes.ok) {
         const srvData = await srvRes.json();
@@ -120,7 +118,7 @@ export default function GoogleMapPicker({
 
       // 3. Fallback to OpenStreetMap Reverse
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=ar`
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=ar,en`
       );
       if (res.ok) {
         const data = await res.json();
@@ -153,7 +151,7 @@ export default function GoogleMapPicker({
     setShowDropdown(false);
 
     try {
-      // 1. Direct coordinate format check (e.g. "15.3694, 44.1910")
+      // 1. Direct coordinate format check (e.g. "24.7136, 46.6753")
       const coordMatch = q.match(/^([-+]?\d+(\.\d+)?)[,\s]+([-+]?\d+(\.\d+)?)$/);
       if (coordMatch) {
         const lat = parseFloat(coordMatch[1]);
@@ -173,7 +171,7 @@ export default function GoogleMapPicker({
         }
       }
 
-      // 2. Query our comprehensive Server Geocoding endpoint
+      // 2. Query our comprehensive Worldwide Server Geocoding endpoint
       let foundList: Array<{ display_name: string; lat: string; lon: string }> = [];
       try {
         const res = await fetch(`/api/geocode/search?q=${encodeURIComponent(q)}`);
@@ -187,11 +185,11 @@ export default function GoogleMapPicker({
         console.warn("Server geocode search error:", e);
       }
 
-      // 3. Fallback to Google Geocoder if available
+      // 3. Fallback to Google Geocoder if available (Worldwide without country lock)
       if (foundList.length === 0 && window.google?.maps?.Geocoder) {
         try {
           const geocoder = new window.google.maps.Geocoder();
-          const gResult = await geocoder.geocode({ address: q, componentRestrictions: { country: 'YE' } });
+          const gResult = await geocoder.geocode({ address: q });
           if (gResult.results && gResult.results.length > 0) {
             foundList = gResult.results.map((r: any) => ({
               display_name: r.formatted_address,
@@ -204,10 +202,10 @@ export default function GoogleMapPicker({
         }
       }
 
-      // 4. Fallback to Photon
+      // 4. Fallback to Photon Worldwide
       if (foundList.length === 0) {
         try {
-          const photonRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q + ' Yemen')}&lang=default&limit=5`);
+          const photonRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lang=default&limit=6`);
           if (photonRes.ok) {
             const pData = await photonRes.json();
             if (pData?.features?.length > 0) {
@@ -269,18 +267,18 @@ export default function GoogleMapPicker({
     }
   };
 
-  const handleQuickPlaceSelect = (loc: typeof POPULAR_YEMEN_LOCATIONS[0]) => {
+  const handleQuickPlaceSelect = (loc: typeof POPULAR_GLOBAL_LOCATIONS[0]) => {
     const newPos = { lat: loc.lat, lng: loc.lng };
     setMarker(newPos);
     setMapCenter([loc.lat, loc.lng]);
-    setMapZoom(16);
+    setMapZoom(15);
     setAddress(loc.query);
     setSearchQuery(loc.name);
     setShowDropdown(false);
 
     if (map) {
       map.panTo(newPos);
-      map.setZoom(16);
+      map.setZoom(15);
     }
   };
 
@@ -345,11 +343,11 @@ export default function GoogleMapPicker({
         {/* Title */}
         <div className="flex items-center gap-2 shrink-0">
           <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
-            <MapPin className="h-5 w-5 text-white" />
+            <Globe className="h-5 w-5 text-white" />
           </div>
           <div>
             <h2 className="font-bold text-sm sm:text-base leading-tight">{title}</h2>
-            <p className="text-[11px] text-orange-100 hidden sm:block">ابحث بالاسم أو حدد النقطة مباشرة على الخريطة</p>
+            <p className="text-[11px] text-orange-100 hidden sm:block">ابحث في جميع مدن ودول وعناوين العالم أو انقر على الخريطة</p>
           </div>
         </div>
 
@@ -366,7 +364,7 @@ export default function GoogleMapPicker({
                   handleSearch();
                 }
               }}
-              placeholder="ابحث عن منطقة، شارع، معلم (مثال: حدة، السبعين)..."
+              placeholder="ابحث عن أي مدينة، شارع، عنوان في العالم (مثال: دبي، الرياض، لندن)..."
               className="w-full py-1 px-3 text-xs sm:text-sm text-gray-900 placeholder-gray-400 bg-transparent border-none focus:outline-none text-right font-medium"
               dir="rtl"
             />
@@ -375,7 +373,7 @@ export default function GoogleMapPicker({
               onClick={() => handleSearch()}
               disabled={isSearching}
               className="bg-[#f06424] hover:bg-orange-700 active:scale-95 text-white px-3 py-1.5 rounded-lg transition-all shrink-0 flex items-center gap-1.5 shadow-sm text-xs font-bold"
-              title="بحث عن موقع"
+              title="بحث عالمي عن موقع"
             >
               {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               <span className="hidden sm:inline">بحث</span>
@@ -425,9 +423,9 @@ export default function GoogleMapPicker({
       <div className="px-3 py-2 bg-orange-50/60 dark:bg-zinc-800/60 flex items-center gap-1.5 overflow-x-auto no-scrollbar" dir="rtl">
         <div className="flex items-center gap-1 text-[11px] font-bold text-orange-800 dark:text-orange-400 shrink-0 ml-1">
           <Sparkles className="h-3.5 w-3.5 text-orange-500" />
-          <span>أماكن شائعة:</span>
+          <span>وجهات سريعة:</span>
         </div>
-        {POPULAR_YEMEN_LOCATIONS.map((loc, idx) => (
+        {POPULAR_GLOBAL_LOCATIONS.map((loc, idx) => (
           <button
             key={idx}
             type="button"
@@ -447,7 +445,7 @@ export default function GoogleMapPicker({
       <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[9999] flex items-center justify-center p-2 sm:p-4" dir="rtl">
         <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100 dark:border-zinc-800">
           {/* Header with Search */}
-          {renderHeader("تحديد الموقع عبر الخريطة")}
+          {renderHeader("البحث وتحديد الموقع على الخريطة (عالمي)")}
 
           {/* Map */}
           <div className="flex-1 relative bg-slate-100 dark:bg-zinc-950">
@@ -538,7 +536,7 @@ export default function GoogleMapPicker({
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[9999] flex items-center justify-center p-2 sm:p-4" dir="rtl">
       <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100 dark:border-zinc-800">
         {/* Header with Search */}
-        {renderHeader("تحديد الموقع بدقة عبر الخريطة")}
+        {renderHeader("البحث وتحديد الموقع على الخريطة (عالمي)")}
 
         {/* Map */}
         <div className="flex-1 relative bg-slate-100 dark:bg-zinc-950">
