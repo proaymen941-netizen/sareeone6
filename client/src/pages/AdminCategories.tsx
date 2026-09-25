@@ -489,129 +489,178 @@ export default function AdminCategories() {
 
       {/* Add / Edit Category Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsDialogOpen(open); }}>
-        <DialogContent className="max-w-lg" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold flex items-center gap-2">
-              <Layers className="h-5 w-5 text-primary" />
-              {editingCategory ? 'تعديل تصنيف المتجر' : 'إضافة تصنيف متجر جديد'}
-            </DialogTitle>
-            <DialogDescription>
-              تحديد اسم التصنيف (مطاعم، صيدليات، سوبرماركت...) وصورة العلاف والترتيب
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-            <div>
-              <Label htmlFor="name" className="text-xs font-bold text-gray-700 mb-1.5 block">
-                اسم التصنيف <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="مثال: مطاعم ومأكولات، سوبر ماركت، صيدليات..."
-                required
-                data-testid="input-category-name"
-              />
-            </div>
-
-            {/* Presets Selection */}
-            {!editingCategory && (
+        <DialogContent className="max-w-4xl lg:max-w-5xl w-[95vw] max-h-[92vh] flex flex-col p-0 overflow-hidden rounded-2xl" dir="rtl">
+          {/* Branded Header */}
+          <div className="p-4 sm:p-5 bg-gradient-to-r from-orange-600 via-[#f06424] to-amber-600 text-white flex items-center justify-between shadow-sm shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-white/20 rounded-xl backdrop-blur-xs">
+                <Layers className="h-6 w-6 text-white" />
+              </div>
               <div>
-                <Label className="text-xs font-medium text-gray-500 mb-1.5 block">
-                  اختر من النماذج السريعة:
-                </Label>
-                <div className="flex flex-wrap gap-1.5">
-                  {PRESET_STORE_CATEGORIES.map((preset, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handleApplyPreset(preset)}
-                      className={`text-xs px-2.5 py-1 rounded-md border transition-all ${
-                        formData.name === preset.name
-                          ? 'bg-primary text-white border-primary font-bold shadow-xs'
-                          : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
-                      }`}
-                    >
-                      {preset.name}
-                    </button>
-                  ))}
+                <DialogTitle className="text-base sm:text-lg font-bold text-white">
+                  {editingCategory ? 'تعديل تصنيف المتجر' : 'إضافة تصنيف متجر جديد'}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-orange-100 mt-0.5">
+                  إدارة بيانات التصنيف (مطاعم، صيدليات، سوبرماركت...)، صورة الغلاف، وترتيب الظهور
+                </DialogDescription>
+              </div>
+            </div>
+            {editingCategory && (
+              <Badge variant="outline" className="bg-white/10 text-white border-white/30 text-xs hidden sm:flex">
+                معرّف: #{editingCategory.id.slice(0, 8)}
+              </Badge>
+            )}
+          </div>
+
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+            {/* Horizontal 2-Column Form Body */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 p-5 sm:p-6 overflow-y-auto flex-1 bg-gray-50/50 dark:bg-zinc-950/40">
+              
+              {/* Column 1: Basic Info & Presets */}
+              <div className="space-y-4">
+                <div className="bg-white dark:bg-zinc-900 p-4 sm:p-5 rounded-2xl border border-gray-200/80 dark:border-zinc-800 shadow-2xs space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-zinc-800">
+                    <Tag className="h-4 w-4 text-[#f06424]" />
+                    <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">بيانات التصنيف الأساسية</h3>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="name" className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">
+                      اسم التصنيف <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="مثال: مطاعم ومأكولات، سوبر ماركت، صيدليات..."
+                      required
+                      className="h-10 rounded-xl"
+                      data-testid="input-category-name"
+                    />
+                  </div>
+
+                  {/* Presets Selection */}
+                  {!editingCategory && (
+                    <div className="bg-orange-50/60 dark:bg-zinc-800/60 p-3 rounded-xl border border-orange-200/70 dark:border-zinc-700/70 space-y-2">
+                      <Label className="text-xs font-bold text-orange-950 dark:text-orange-300 flex items-center gap-1">
+                        <Sparkles className="h-3.5 w-3.5 text-[#f06424]" />
+                        <span>اختر من النماذج السريعة الجاهزة:</span>
+                      </Label>
+                      <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                        {PRESET_STORE_CATEGORIES.map((preset, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => handleApplyPreset(preset)}
+                            className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${
+                              formData.name === preset.name
+                                ? 'bg-[#f06424] text-white border-orange-600 font-bold shadow-xs'
+                                : 'bg-white dark:bg-zinc-900 hover:bg-orange-100 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-zinc-700'
+                            }`}
+                          >
+                            {preset.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <Label htmlFor="icon" className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">
+                        رمز الأيقونة (Icon Code)
+                      </Label>
+                      <Input
+                        id="icon"
+                        value={formData.icon}
+                        onChange={(e) => setFormData(prev => ({ ...prev, icon: e.target.value }))}
+                        placeholder="Store, Utensils..."
+                        className="h-10 rounded-xl font-mono text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="sortOrder" className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">
+                        ترتيب العرض (Sort Order)
+                      </Label>
+                      <Input
+                        id="sortOrder"
+                        type="number"
+                        min="0"
+                        value={formData.sortOrder}
+                        onChange={(e) => setFormData(prev => ({ ...prev, sortOrder: parseInt(e.target.value) || 0 }))}
+                        placeholder="0"
+                        className="h-10 rounded-xl"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Active Status Card */}
+                <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-gray-200/80 dark:border-zinc-800 shadow-2xs flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="isActive" className="text-sm font-bold text-gray-900 dark:text-gray-100 cursor-pointer">
+                      حالة التصنيف (مفعل للعملاء)
+                    </Label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      عند التفعيل يظهر هذا التصنيف للعملاء في الصفحة الرئيسية والقوائم
+                    </p>
+                  </div>
+                  <Switch
+                    id="isActive"
+                    checked={formData.isActive}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isActive: checked }))}
+                    data-testid="switch-category-active"
+                  />
                 </div>
               </div>
-            )}
 
-            <div>
-              <ImageUpload
-                label="صورة غلاف التصنيف (تظهر في التطبيق والصفحة الرئيسية)"
-                value={formData.image}
-                onChange={(url) => setFormData(prev => ({ ...prev, image: url }))}
-                bucket="categories"
-              />
-            </div>
+              {/* Column 2: Category Cover Image & Preview */}
+              <div className="space-y-4">
+                <div className="bg-white dark:bg-zinc-900 p-4 sm:p-5 rounded-2xl border border-gray-200/80 dark:border-zinc-800 shadow-2xs space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-zinc-800">
+                    <Store className="h-4 w-4 text-[#f06424]" />
+                    <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">صورة غلاف التصنيف</h3>
+                  </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="icon" className="text-xs font-bold text-gray-700 mb-1.5 block">
-                  رمز الأيقونة (Icon Code)
-                </Label>
-                <Input
-                  id="icon"
-                  value={formData.icon}
-                  onChange={(e) => setFormData(prev => ({ ...prev, icon: e.target.value }))}
-                  placeholder="Store, Utensils, ShoppingBag..."
-                />
+                  <ImageUpload
+                    label="صورة غلاف التصنيف (تظهر في التطبيق والصفحة الرئيسية)"
+                    value={formData.image}
+                    onChange={(url) => setFormData(prev => ({ ...prev, image: url }))}
+                    bucket="categories"
+                  />
+
+                  <div className="p-3 bg-blue-50/70 dark:bg-blue-950/30 rounded-xl border border-blue-200/70 dark:border-blue-900/40 text-xs text-blue-900 dark:text-blue-300 leading-relaxed">
+                    💡 <strong>تلميح التصميم:</strong> يُفضل استخدام صور جذابة عالية الجودة بدقة مربعة أو مستطيلة (مثال: 500×300) تعبر بوضوح عن نوع المتاجر المندرجة تحت هذا التصنيف.
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <Label htmlFor="sortOrder" className="text-xs font-bold text-gray-700 mb-1.5 block">
-                  ترتيب العرض (Sort Order)
-                </Label>
-                <Input
-                  id="sortOrder"
-                  type="number"
-                  min="0"
-                  value={formData.sortOrder}
-                  onChange={(e) => setFormData(prev => ({ ...prev, sortOrder: parseInt(e.target.value) || 0 }))}
-                  placeholder="0"
-                />
-              </div>
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-              <div>
-                <Label htmlFor="isActive" className="text-sm font-bold text-gray-900 cursor-pointer">
-                  حالة التصنيف (مفعل للعملاء)
-                </Label>
-                <p className="text-xs text-gray-500">
-                  عند التفعيل يظهر هذا التصنيف للعملاء في القوائم والصفحة الرئيسية
-                </p>
-              </div>
-              <Switch
-                id="isActive"
-                checked={formData.isActive}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isActive: checked }))}
-                data-testid="switch-category-active"
-              />
-            </div>
+            {/* Footer Actions */}
+            <div className="p-4 sm:p-5 border-t border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between gap-3 shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 px-6 rounded-xl font-bold text-gray-700 dark:text-gray-300 border-gray-300 dark:border-zinc-700 hover:bg-gray-100 dark:hover:bg-zinc-800"
+                onClick={() => { resetForm(); setIsDialogOpen(false); }}
+                data-testid="button-cancel-category"
+              >
+                <X className="h-4 w-4 ml-1.5" />
+                إلغاء
+              </Button>
 
-            <div className="flex items-center gap-2 pt-4 border-t">
               <Button
                 type="submit"
-                className="flex-1 gap-2 bg-primary hover:bg-primary/90 text-white font-bold"
+                className="h-11 px-8 rounded-xl gap-2 font-bold bg-[#f06424] hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20 active:scale-[0.99] transition-all"
                 disabled={createCategoryMutation.isPending || updateCategoryMutation.isPending}
                 data-testid="button-save-category"
               >
                 <Save className="h-4 w-4" />
-                {editingCategory ? 'حفظ التعديلات' : 'إنشاء التصنيف'}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => { resetForm(); setIsDialogOpen(false); }}
-                data-testid="button-cancel-category"
-              >
-                <X className="h-4 w-4" />
-                إلغاء
+                {createCategoryMutation.isPending || updateCategoryMutation.isPending 
+                  ? 'جاري الحفظ...' 
+                  : (editingCategory ? 'حفظ التعديلات' : 'إنشاء التصنيف')}
               </Button>
             </div>
           </form>

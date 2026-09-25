@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Package, Save, X, Search, Store, Layers } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, Save, X, Search, Store, Layers, Tag, Sparkles, DollarSign, Star, ShoppingBag, Eye, CheckCircle2, Flame, Award } from 'lucide-react';
 import ImageUpload from '@/components/ImageUpload';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -326,218 +326,364 @@ export default function AdminMenuItems() {
         </div>
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
-          <DialogHeader>
-            <DialogTitle>
-              {editingItem ? 'تعديل المنتج' : 'إضافة منتج جديد'}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="restaurantId">المتجر / المطعم *</Label>
-              <Select
-                value={formData.restaurantId}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, restaurantId: value, category: '' }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="اختر المتجر أو المطعم" />
-                </SelectTrigger>
-                <SelectContent>
-                  {restaurants.map((restaurant) => (
-                    <SelectItem key={restaurant.id} value={restaurant.id}>
-                      {restaurant.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4">
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsDialogOpen(open); }}>
+        <DialogContent className="max-w-5xl lg:max-w-6xl w-[96vw] max-h-[92vh] flex flex-col p-0 overflow-hidden rounded-2xl" dir="rtl">
+          {/* Branded Header */}
+          <div className="p-4 sm:p-5 bg-gradient-to-r from-orange-600 via-[#f06424] to-amber-600 text-white flex items-center justify-between shadow-sm shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-white/20 rounded-xl backdrop-blur-xs">
+                <Package className="h-6 w-6 text-white" />
+              </div>
               <div>
-                <Label htmlFor="name">اسم المنتج *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="أدخل اسم المنتج"
-                  required
-                />
+                <DialogTitle className="text-base sm:text-lg font-bold text-white">
+                  {editingItem ? 'تعديل بيانات المنتج' : 'إضافة منتج جديد للمتجر'}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-orange-100 mt-0.5">
+                  تحديد المتجر التابع له، اسم المنتج، الأسعار، الصورة، والأقسام
+                </DialogDescription>
               </div>
             </div>
+            {editingItem && (
+              <Badge variant="outline" className="bg-white/10 text-white border-white/30 text-xs hidden sm:flex">
+                معرّف المنتج: #{editingItem.id.slice(0, 8)}
+              </Badge>
+            )}
+          </div>
+          
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+            {/* Horizontal 2-Column Form Body */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 p-5 sm:p-6 overflow-y-auto flex-1 bg-gray-50/50 dark:bg-zinc-950/40">
+              
+              {/* Column 1: Store, Name, Category & Pricing */}
+              <div className="space-y-4">
+                {/* Basic Identification Card */}
+                <div className="bg-white dark:bg-zinc-900 p-4 sm:p-5 rounded-2xl border border-gray-200/80 dark:border-zinc-800 shadow-2xs space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-zinc-800">
+                    <Store className="h-4 w-4 text-[#f06424]" />
+                    <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">المتجر والبيانات الأساسية</h3>
+                  </div>
 
-            <div>
-              <Label htmlFor="description">وصف المنتج</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="وصف المنتج"
-                rows={2}
-              />
-            </div>
+                  <div>
+                    <Label htmlFor="restaurantId" className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">
+                      المتجر / المطعم التابع له <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={formData.restaurantId}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, restaurantId: value, category: '' }))}
+                    >
+                      <SelectTrigger className="h-10 rounded-xl">
+                        <SelectValue placeholder="اختر المتجر أو المطعم" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {restaurants.map((restaurant) => (
+                          <SelectItem key={restaurant.id} value={restaurant.id}>
+                            {restaurant.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-            <div>
-              <ImageUpload
-                label="صورة المنتج *"
-                value={formData.image}
-                onChange={(url) => setFormData(prev => ({ ...prev, image: url }))}
-                bucket="menu-items"
-                required={true}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="category">
-                  <span className="flex items-center gap-1">
-                    <Layers className="h-4 w-4" />
-                    {activeSections.length > 0 ? 'قسم المنتج (من أقسام المتجر)' : 'قسم المنتج'}
-                  </span>
-                </Label>
-                {activeSections.length > 0 ? (
-                  <Select
-                    value={formData.category}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر القسم" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {activeSections.map((section: any) => (
-                        <SelectItem key={section.id} value={section.name}>
-                          {section.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div className="space-y-2">
+                  <div>
+                    <Label htmlFor="name" className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">
+                      اسم المنتج <span className="text-red-500">*</span>
+                    </Label>
                     <Input
-                      id="category"
-                      value={formData.category}
-                      onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                      placeholder={formData.restaurantId ? "لا توجد أقسام - أدخل اسم القسم يدوياً" : "اختر المتجر أولاً ثم أدخل القسم"}
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="مثال: برجر دجاج كلاسيك، بيتزا مارغريتا..."
                       required
+                      className="h-10 rounded-xl"
+                      data-testid="input-menu-item-name"
                     />
-                    {formData.restaurantId && (
-                      <p className="text-xs text-amber-600">
-                        💡 لم يتم إضافة أقسام لهذا المتجر بعد. يمكنك إدارة الأقسام من صفحة المتاجر.
-                      </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="category" className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">
+                      <span className="flex items-center gap-1.5">
+                        <Layers className="h-3.5 w-3.5 text-[#f06424]" />
+                        <span>{activeSections.length > 0 ? 'قسم المنتج (من أقسام المتجر المختارة)' : 'قسم المنتج'} <span className="text-red-500">*</span></span>
+                      </span>
+                    </Label>
+                    {activeSections.length > 0 ? (
+                      <Select
+                        value={formData.category}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                      >
+                        <SelectTrigger className="h-10 rounded-xl">
+                          <SelectValue placeholder="اختر القسم داخل المتجر" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {activeSections.map((section: any) => (
+                            <SelectItem key={section.id} value={section.name}>
+                              {section.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <Input
+                          id="category"
+                          value={formData.category}
+                          onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                          placeholder={formData.restaurantId ? "أدخل اسم القسم يدوياً (مثال: برجر، وجبات رئيسية)..." : "اختر المتجر أولاً ثم أدخل القسم"}
+                          required
+                          className="h-10 rounded-xl"
+                        />
+                        {formData.restaurantId && (
+                          <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                            💡 لم يتم إنشاء أقسام لهذا المتجر بعد. يمكنك إدخال اسم القسم هنا مباشرة أو إدارتها من صفحة المتاجر.
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
+                </div>
+
+                {/* Pricing & Sales Card */}
+                <div className="bg-white dark:bg-zinc-900 p-4 sm:p-5 rounded-2xl border border-gray-200/80 dark:border-zinc-800 shadow-2xs space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-zinc-800">
+                    <DollarSign className="h-4 w-4 text-[#f06424]" />
+                    <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">التسعير والمبيعات</h3>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="price" className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">
+                        سعر البيع (ريال) <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="price"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.price}
+                        onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
+                        placeholder="0.00"
+                        required
+                        className="h-10 rounded-xl font-bold text-emerald-600"
+                        data-testid="input-menu-item-price"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="originalPrice" className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">
+                        السعر الأصلي (قبل الخصم)
+                      </Label>
+                      <Input
+                        id="originalPrice"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.originalPrice}
+                        onChange={(e) => setFormData(prev => ({ ...prev, originalPrice: e.target.value }))}
+                        placeholder="0.00"
+                        className="h-10 rounded-xl"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <Label htmlFor="salesCount" className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">
+                        عدد المبيعات
+                      </Label>
+                      <Input
+                        id="salesCount"
+                        type="number"
+                        min="0"
+                        value={formData.salesCount}
+                        onChange={(e) => setFormData(prev => ({ ...prev, salesCount: e.target.value }))}
+                        className="h-10 rounded-xl"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="rating" className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">
+                        التقييم (1-5)
+                      </Label>
+                      <Input
+                        id="rating"
+                        type="number"
+                        min="1"
+                        max="5"
+                        step="0.1"
+                        value={formData.rating}
+                        onChange={(e) => setFormData(prev => ({ ...prev, rating: e.target.value }))}
+                        className="h-10 rounded-xl"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Optional Brand, Sizes, Colors */}
+                  <div className="grid grid-cols-3 gap-2 pt-1 border-t border-gray-100 dark:border-zinc-800">
+                    <div>
+                      <Label htmlFor="brand" className="text-[11px] font-medium text-gray-500 mb-1 block">
+                        الماركة
+                      </Label>
+                      <Input
+                        id="brand"
+                        value={formData.brand}
+                        onChange={(e) => setFormData(prev => ({ ...prev, brand: e.target.value }))}
+                        placeholder="اختياري"
+                        className="h-9 text-xs rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="sizes" className="text-[11px] font-medium text-gray-500 mb-1 block">
+                        المقاسات
+                      </Label>
+                      <Input
+                        id="sizes"
+                        value={formData.sizes}
+                        onChange={(e) => setFormData(prev => ({ ...prev, sizes: e.target.value }))}
+                        placeholder="صغير، كبير..."
+                        className="h-9 text-xs rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="colors" className="text-[11px] font-medium text-gray-500 mb-1 block">
+                        الألوان
+                      </Label>
+                      <Input
+                        id="colors"
+                        value={formData.colors}
+                        onChange={(e) => setFormData(prev => ({ ...prev, colors: e.target.value }))}
+                        placeholder="أحمر، أزرق..."
+                        className="h-9 text-xs rounded-lg"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <Label htmlFor="price">السعر (ريال) *</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.price}
-                  onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
-                  placeholder="0.00"
-                  required
-                />
+              {/* Column 2: Image, Description & Availability */}
+              <div className="space-y-4">
+                {/* Image Upload Card */}
+                <div className="bg-white dark:bg-zinc-900 p-4 sm:p-5 rounded-2xl border border-gray-200/80 dark:border-zinc-800 shadow-2xs space-y-3">
+                  <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-zinc-800">
+                    <Tag className="h-4 w-4 text-[#f06424]" />
+                    <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">صورة المنتج والوصف</h3>
+                  </div>
+
+                  <ImageUpload
+                    label="صورة المنتج الرئيسية *"
+                    value={formData.image}
+                    onChange={(url) => setFormData(prev => ({ ...prev, image: url }))}
+                    bucket="menu-items"
+                    required={true}
+                    data-testid="input-menu-item-image"
+                  />
+
+                  <div>
+                    <Label htmlFor="description" className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">
+                      وصف المنتج والمكونات
+                    </Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="وصف مكونات ومميزات المنتج..."
+                      rows={3}
+                      className="rounded-xl resize-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Status & Visibility Flags */}
+                <div className="bg-white dark:bg-zinc-900 p-4 sm:p-5 rounded-2xl border border-gray-200/80 dark:border-zinc-800 shadow-2xs space-y-3">
+                  <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-zinc-800">
+                    <Eye className="h-4 w-4 text-[#f06424]" />
+                    <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">حالات التوفر والظهور في التطبيق</h3>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-gray-50 dark:bg-zinc-800/60 rounded-xl border border-gray-100 dark:border-zinc-800 flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="isAvailable" className="text-xs font-bold text-gray-900 dark:text-gray-100 cursor-pointer">
+                          متوفر للطلب
+                        </Label>
+                        <p className="text-[10px] text-gray-500">جاهز للطلب فوراً</p>
+                      </div>
+                      <Switch
+                        id="isAvailable"
+                        checked={formData.isAvailable}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isAvailable: checked }))}
+                      />
+                    </div>
+
+                    <div className="p-3 bg-gray-50 dark:bg-zinc-800/60 rounded-xl border border-gray-100 dark:border-zinc-800 flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="isSpecialOffer" className="text-xs font-bold text-gray-900 dark:text-gray-100 cursor-pointer">
+                          عرض خاص
+                        </Label>
+                        <p className="text-[10px] text-gray-500">يظهر في العروض</p>
+                      </div>
+                      <Switch
+                        id="isSpecialOffer"
+                        checked={formData.isSpecialOffer}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isSpecialOffer: checked }))}
+                      />
+                    </div>
+
+                    <div className="p-3 bg-gray-50 dark:bg-zinc-800/60 rounded-xl border border-gray-100 dark:border-zinc-800 flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="isFeatured" className="text-xs font-bold text-gray-900 dark:text-gray-100 cursor-pointer">
+                          منتج مميز
+                        </Label>
+                        <p className="text-[10px] text-gray-500">شعار مميز أعلى القائمة</p>
+                      </div>
+                      <Switch
+                        id="isFeatured"
+                        checked={formData.isFeatured}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isFeatured: checked }))}
+                      />
+                    </div>
+
+                    <div className="p-3 bg-gray-50 dark:bg-zinc-800/60 rounded-xl border border-gray-100 dark:border-zinc-800 flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="isNew" className="text-xs font-bold text-gray-900 dark:text-gray-100 cursor-pointer">
+                          منتج جديد
+                        </Label>
+                        <p className="text-[10px] text-gray-500">شارة جديد</p>
+                      </div>
+                      <Switch
+                        id="isNew"
+                        checked={formData.isNew}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isNew: checked }))}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
+
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="originalPrice">السعر الأصلي</Label>
-                <Input
-                  id="originalPrice"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.originalPrice}
-                  onChange={(e) => setFormData(prev => ({ ...prev, originalPrice: e.target.value }))}
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <Label htmlFor="salesCount">عدد المبيعات</Label>
-                <Input
-                  id="salesCount"
-                  type="number"
-                  min="0"
-                  value={formData.salesCount}
-                  onChange={(e) => setFormData(prev => ({ ...prev, salesCount: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="rating">التقييم (1-5)</Label>
-                <Input
-                  id="rating"
-                  type="number"
-                  min="1"
-                  max="5"
-                  step="0.1"
-                  value={formData.rating}
-                  onChange={(e) => setFormData(prev => ({ ...prev, rating: e.target.value }))}
-                />
-              </div>
-            </div>
+            {/* Footer Actions */}
+            <div className="p-4 sm:p-5 border-t border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between gap-3 shrink-0">
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="h-11 px-6 rounded-xl font-bold text-gray-700 dark:text-gray-300 border-gray-300 dark:border-zinc-700 hover:bg-gray-100 dark:hover:bg-zinc-800"
+                onClick={() => { resetForm(); setIsDialogOpen(false); }}
+                data-testid="button-cancel-menu-item"
+              >
+                <X className="h-4 w-4 ml-1.5" />
+                إلغاء
+              </Button>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="isAvailable">متوفر</Label>
-                <Switch
-                  id="isAvailable"
-                  checked={formData.isAvailable}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isAvailable: checked }))}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label htmlFor="isSpecialOffer">عرض خاص</Label>
-                <Switch
-                  id="isSpecialOffer"
-                  checked={formData.isSpecialOffer}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isSpecialOffer: checked }))}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label htmlFor="isFeatured">مميز</Label>
-                <Switch
-                  id="isFeatured"
-                  checked={formData.isFeatured}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isFeatured: checked }))}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label htmlFor="isNew">جديد</Label>
-                <Switch
-                  id="isNew"
-                  checked={formData.isNew}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isNew: checked }))}
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-4">
               <Button 
                 type="submit" 
-                className="flex-1 gap-2"
+                className="h-11 px-8 rounded-xl gap-2 font-bold bg-[#f06424] hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20 active:scale-[0.99] transition-all"
                 disabled={createMenuItemMutation.isPending || updateMenuItemMutation.isPending}
                 data-testid="button-save-menu-item"
               >
                 <Save className="h-4 w-4" />
-                {editingItem ? 'تحديث' : 'إضافة'}
-              </Button>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => { resetForm(); setIsDialogOpen(false); }}
-                data-testid="button-cancel-menu-item"
-              >
-                <X className="h-4 w-4" />
-                إلغاء
+                {createMenuItemMutation.isPending || updateMenuItemMutation.isPending 
+                  ? 'جاري الحفظ...' 
+                  : (editingItem ? 'تحديث بيانات المنتج' : 'إضافة المنتج')}
               </Button>
             </div>
           </form>
